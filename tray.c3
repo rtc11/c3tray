@@ -25,37 +25,6 @@ const ZString TRAY_ICON = "icon.png";
 ObjcId status_item;
 ObjcId app;
 
-fn ObjcId ns_menu(Menu[] ms)
-{
-    ObjcId menu = objc::msg_send(objc::alloc(objc::getClass("NSMenu")), SendVoid, "init");
-    objc::msg_send(menu, SendBool, "setAutoenablesItems:", false);
-    foreach(m: ms) {
-        if (m.text == "-") {
-            ObjcId separator;
-            objc::object_getIVar(menu, "separatorItem", &separator);
-            objc::msg_send(menu, SendId, "addItem:", separator);
-        } else {
-            ObjcSelector menu_cb = objc::sel_registerName("menuCallback:");
-            ObjcClass menu_item_cls = objc::getClass("NSMenuItem");
-            objc::class_addMethod(menu_item_cls, menu_cb, &m.cb, ""); // is this how we use the callbacks?
-            ObjcId menu_item = objc::msg_send(objc::alloc(menu_item_cls), SendVoid, "init");
-            ObjcId title = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", m.text);
-            objc::msg_send(menu_item, SendId, "title:", title);
-            objc::msg_send(menu_item, SendSelector, "action:", menu_cb);
-            objc::msg_send(menu_item, SendBool, "setEnabled:", m.disabled);
-            objc::msg_send(menu_item, SendInt, "setState:", m.checked ? 1 : 0);
-            ObjcId value = objc::msg_send(objc::getClass("NSValue"), SendPtr, "valueWithPointer:", &m);
-            objc::msg_send(menu_item, SendId, "setRepresentedObject:", value);
-            objc::msg_send(menu, SendId, "addItem:", menu_item);
-            if (m.sub_menu) {
-                objc::msg_send(menu, SendId, "setSubmenu:", ns_menu(*m.sub_menu));
-            }
-        }
-    }
-    return menu;
-}
-
-// todo: why is the tray icon not showing?
 fn bool Tray.init(&self)
 {
     ObjcClass app_delegate = objc::allocateClassPair(objc::getClass("NSObject"), "AppDelegate", 0);
@@ -87,6 +56,20 @@ fn bool Tray.init(&self)
     return true;
 }
 
+// todo: why is the tray icon not showing?
+fn void Tray.update(&self)
+{
+    ObjcId img_init = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", self.icon);
+    ObjcId img = objc::msg_send(objc::alloc(objc::getClass("NSImage")), SendId, "initWithContentsOfFile:", img_init);
+    objc::msg_send(img, SendSize, "setSize:", Size {16, 16});
+    ObjcClass button;
+    objc::object_getIVar(status_item, "button", &button);
+    objc::object_setIVar(&button, "image", img);
+    objc::object_setIVar(status_item, "button", &button);
+    objc::msg_send(status_item, SendId, "setMenu:", ns_menu(self.menu));
+
+}
+
 fn bool Tray.loop(&self)
 {
     ObjcId loop = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", "kCFRunLoopDefaultMode");
@@ -101,17 +84,35 @@ fn bool Tray.loop(&self)
     return true; // true
 }
 
-fn void Tray.update(&self)
+fn ObjcId ns_menu(Menu[] ms)
 {
-    ObjcId img_init = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", self.icon);
-    ObjcId img = objc::msg_send(objc::alloc(objc::getClass("NSImage")), SendId, "initWithContentsOfFile:", img_init);
-    objc::msg_send(img, SendSize, "setSize:", Size {16, 16});
-    ObjcClass button;
-    objc::object_getIVar(status_item, "button", &button);
-    objc::object_setIVar(&button, "image", img);
-    objc::object_setIVar(status_item, "button", &button);
-    // objc::msg_send(status_item, SendId, "setMenu:", ns_menu(self.menu));
-
+    ObjcId menu = objc::msg_send(objc::alloc(objc::getClass("NSMenu")), SendVoid, "init");
+    objc::msg_send(menu, SendBool, "setAutoenablesItems:", false);
+    foreach(m: ms) {
+        if (m.text == "-") {
+            ObjcId separator;
+            objc::object_getIVar(menu, "separatorItem", &separator);
+            objc::msg_send(menu, SendId, "addItem:", separator);
+        } else if (false) {
+            ObjcSelector menu_cb = objc::sel_registerName("menuCallback:");
+            ObjcClass menu_item_cls = objc::getClass("NSMenuItem");
+            objc::class_addMethod(menu_item_cls, menu_cb, &m.cb, ""); // is this how we use the callbacks?
+            // ObjcId menu_item = objc::msg_send(objc::alloc(menu_item_cls), SendVoid, "init");
+            ObjcId title = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", m.text);
+            ObjcId menu_item = objc::msg_send(objc::alloc(menu_item_cls), SendInitWithTitle, "initWithTitle:action:keyEquivalent:", title, null, "");
+            // objc::msg_send(menu_item, SendId, "title:", title);
+            objc::msg_send(menu_item, SendSelector, "action:", menu_cb);
+            objc::msg_send(menu_item, SendBool, "setEnabled:", m.disabled);
+            objc::msg_send(menu_item, SendInt, "setState:", m.checked ? 1 : 0);
+            ObjcId value = objc::msg_send(objc::getClass("NSValue"), SendPtr, "valueWithPointer:", &m);
+            objc::msg_send(menu_item, SendId, "setRepresentedObject:", value);
+            objc::msg_send(menu, SendId, "addItem:", menu_item);
+            if (m.sub_menu) {
+                objc::msg_send(menu, SendId, "setSubmenu:", ns_menu(*m.sub_menu));
+            }
+        }
+    }
+    return menu;
 }
 
 fn void Tray.exit(&self)
