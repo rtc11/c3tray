@@ -1,5 +1,7 @@
 # System Tray in C3
 
+![img](screenshot.png)
+
 ### tray.c3
 Create a system tray status bar with a menu, ported from [c](https://github.com/binRick/c_tray)
 
