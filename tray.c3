@@ -106,12 +106,11 @@ fn ObjcId ns_menu(Menu[] ms)
     objc::msg_send(menu, SendBool, "setAutoenablesItems:", false);
     foreach(m: ms) {
         if (m.text.str_view() == "-") {
-            io::printn("found - ");
-            ObjcId separator;
-            objc::object_getInstanceVariable(menu, "separatorItem", &separator);
+            io::printn("add separator");
+            ObjcId separator = objc::msg_send(objc::getClass("NSMenuItem"), SendVoid, "separatorItem");
             objc::msg_send(menu, SendId, "addItem:", separator);
         } else { 
-            io::printfn("found %s", m.text);
+            io::printfn("add %s", m.text);
             ObjcSelector menu_cb = objc::sel_registerName("menuCallback:");
             ObjcClass menu_item_cls = objc::getClass("NSMenuItem");
             ObjcId title = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", m.text);
