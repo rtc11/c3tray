@@ -3,7 +3,6 @@ import std::io;
 
 def Callback = fn void(Menu *item);
 def SendSize = fn void*(void*, ObjcSelector, Size);
-def SendInitWithTitle = fn void*(void*, ObjcSelector, ObjcId title, ObjcSelector action, ZString keyEquivalent);
 def SendIdId = fn void*(void*, ObjcSelector, ObjcId, ObjcId);
 
 struct Tray {
@@ -26,26 +25,14 @@ ObjcId app;
 
 fn void menu_callback(ObjcId self, ObjcSelector sel, ObjcId sender)
 {
-    io::printfn("self:%s sel:%s sender:%s", self, sel, sender);
-
     ObjcId representedObject = objc::msg_send(sender, SendVoid, "representedObject");
-    io::printfn("representedObject: %s", representedObject);
-
     ObjcId pointerValue = objc::msg_send(representedObject, SendVoid, "pointerValue");
-    io::printfn("pointerValue: %s", pointerValue);
+    ZString title = (ZString)(char*) objc::msg_send(objc::msg_send(sender, SendVoid, "title"), SendVoid, "UTF8String");
 
     if(pointerValue) {
-        Menu* item = (Menu*) pointerValue;
-        // io::printfn("text %s", item.text); // this havent used stringWithUTF8String   
-        io::printfn("disabled %s", item.disabled);
-        io::printfn("checked %s", item.checked);
-        io::printfn("checkbox %s", item.checkbox);
-        io::printfn("cb %s", item.cb);
-        io::printfn("sub_menu %s", item.sub_menu);
-
-        if (item.cb) {
-            item.cb(item);
-        }
+        Menu* menu = (Menu*) pointerValue;
+        io::printfn("%s [disabled:%d, checked:%d, checkbox:%d, cb:%s, sub_menu:%s]", title, menu.disabled, menu.checked, menu.checkbox, menu.cb, menu.sub_menu);
+        menu.cb(menu);
     }
 }
 
@@ -79,42 +66,29 @@ fn bool Tray.loop(&self)
     ObjcId loop = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", "kCFRunLoopDefaultMode");
     ObjcClass* event = objc::msg_send(app, SendDequeueEvent, "nextEventMatchingMask:untilDate:inMode:dequeue:", long.max, null, loop, true);
     objc::msg_send(app, SendId, "sendEvent:", event);
-    int type = objc::msg_send(event, GetInt, "type");
 
-    if (type != 0) {
-        io::printfn("Event [type=%s]", objc::event_type_from(type)!!);
-    }
+    // int type = objc::msg_send(event, GetInt, "type");
+    // if (type != 0) io::printfn("Event [type=%s]", objc::event_type_from(type)!!);
 
     return true;
 }
 
 fn ObjcId ns_menu(Menu[] ms)
 {
+    DString indent;
     ObjcId menu = objc::msg_send(objc::alloc(objc::getClass("NSMenu")), SendVoid, "init");
     objc::msg_send(menu, SendBool, "setAutoenablesItems:", false);
 
     foreach(m: ms) {
         if (m.text.str_view() == "-") {
-            io::printn("add separator");
             ObjcId separator = objc::msg_send(objc::getClass("NSMenuItem"), SendVoid, "separatorItem");
             objc::msg_send(menu, SendId, "addItem:", separator);
         } else { 
-            io::printfn("add %s", m.text);
             ObjcClass menu_item_cls = objc::getClass("NSMenuItem");
             ObjcId title = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", m.text);
             ObjcId menu_item = objc::msg_send(objc::alloc(menu_item_cls), SendVoid, "init");
             objc::msg_send(menu_item, SendId, "setTitle:", title);
             objc::msg_send(menu_item, SendSelector, "setAction:", objc::sel_registerName("menuCallback:"));
-            // ObjcId menu_item = objc::msg_send(
-            //     objc::getClass("NSMenuItem"),
-            //     SendInitWithTitle,
-            //     "initWithTitle:action:keyEquivalent:",
-            //     objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", m.text),
-            //     objc::sel_registerName("menuCallback:"),
-            //     "",
-            // );
-
-
             objc::msg_send(menu_item, SendBool, "setEnabled:", !m.disabled);
             objc::msg_send(menu_item, SendInt, "setState:", m.checked ? 1 : 0);
             ObjcId value = objc::msg_send(objc::getClass("NSValue"), SendPtr, "valueWithPointer:", &m);
@@ -126,11 +100,6 @@ fn ObjcId ns_menu(Menu[] ms)
         }
     }
     return menu;
-}
-
-fn void Tray.exit(&self)
-{
-    objc::msg_send(app, SendId, "terminate", app);
 }
 
 fn void cb_hello(Menu *item)
@@ -150,7 +119,7 @@ fn void cb_toggle(Menu *item)
 fn void cb_quit(Menu *item)
 {
     io::printfn("quit callback");
-    tray.exit();
+    objc::msg_send(app, SendId, "terminate", app);
 }
 
 fn void cb_sub_menu(Menu *item)
@@ -193,9 +162,7 @@ fn void main()
 {
     @pool() {
         tray.init();
-        while(tray.loop()) {
-            // io::printfn("iter");
-        }
+        while(tray.loop());
     };
 }
 
