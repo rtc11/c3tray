@@ -4,7 +4,6 @@ import std::io;
 def Callback = fn void(Menu *item);
 def SendSize = fn void*(void*, ObjcSelector, Size);
 def SendInitWithTitle = fn void*(void*, ObjcSelector, ObjcId title, ObjcSelector action, ZString keyEquivalent);
-def Getd = fn ObjcId(void*, ObjcSelector);
 def SendIdId = fn void*(void*, ObjcSelector, ObjcId, ObjcId);
 
 struct Tray {
@@ -18,7 +17,6 @@ struct Menu {
     bool checked;
     bool checkbox;
     Callback cb;
-    void *context;
     Menu[] *sub_menu;
 }
 
@@ -26,35 +24,36 @@ const ZString TRAY_ICON = "icon.png";
 ObjcId status_item;
 ObjcId app;
 
-struct AppDelegate {
-    Tray *tray;
-}
-
-fn void menu_callback(Menu *item)
+fn void menu_callback(ObjcId self, ObjcSelector sel, ObjcId sender)
 {
-    if (item != null) item.cb(item);
+    io::printfn("self:%s sel:%s sender:%s", self, sel, sender);
+
+    ObjcId representedObject = objc::msg_send(sender, SendVoid, "representedObject");
+    io::printfn("representedObject: %s", representedObject);
+
+    ObjcId pointerValue = objc::msg_send(representedObject, SendVoid, "pointerValue");
+    io::printfn("pointerValue: %s", pointerValue);
+
+    if(pointerValue) {
+        Menu* item = (Menu*) pointerValue;
+        // io::printfn("text %s", item.text); // this havent used stringWithUTF8String   
+        io::printfn("disabled %s", item.disabled);
+        io::printfn("checked %s", item.checked);
+        io::printfn("checkbox %s", item.checkbox);
+        io::printfn("cb %s", item.cb);
+        io::printfn("sub_menu %s", item.sub_menu);
+
+        if (item.cb) {
+            item.cb(item);
+        }
+    }
 }
 
 fn bool Tray.init(&self)
 {
-    ObjcClass app_delegate = objc::allocateClassPair(objc::getClass("NSObject"), "AppDelegate", 0);
-    ObjcId delegate = objc::msg_send(objc::alloc(app_delegate), SendVoid, "init");
-    /*
-        todo: how to do this in c3
-
-        @interface AppDelegate: NSObject <NSApplicationDelegate>
-            - (IBAction)menuCallback:(id)sender;
-        @end
-        @implementation AppDelegate{}
-            - (IBAction)menuCallback:(id)sender
-            {
-                struct tray_menu *m = [[sender representedObject] pointerValue];
-                if (m != NULL && m->cb != NULL) {
-                    m->cb(m);
-                }
-            }
-        @end
-    */
+    ObjcClass delegate_cls = objc::allocateClassPair(objc::getClass("NSObject"), "AppDelegate", 0);
+    objc::class_addMethod(delegate_cls , objc::sel_registerName("menuCallback:"), &menu_callback, "V@:@");
+    ObjcId delegate = objc::msg_send(objc::alloc(delegate_cls), SendVoid, "init");
 
     app = objc::msg_send(objc::getClass("NSApplication"), SendVoid, "sharedApplication");
     objc::msg_send(app, SendId, "setDelegate:", delegate);
@@ -68,22 +67,11 @@ fn bool Tray.init(&self)
 
 fn void Tray.update(&self)
 {
-    ObjcId ns_str = objc::msg_send(
-        objc::getClass("NSString"), 
-        SendString, 
-        "stringWithUTF8String:",
-        self.icon);
-
-    ObjcId img = objc::msg_send(
-        objc::alloc(objc::getClass("NSImage")),
-        SendId,
-        "initWithContentsOfFile:",
-        ns_str);
-    
+    ObjcId ns_str = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", self.icon);
+    ObjcId img = objc::msg_send(objc::alloc(objc::getClass("NSImage")), SendId, "initWithContentsOfFile:", ns_str);
     objc::msg_send(img, SendSize, "setSize:", Size {16, 16});
-    objc::msg_send(status_item, SendId, "setImage:", img); // working
+    objc::msg_send(status_item, SendId, "setImage:", img); // deprecated
     objc::msg_send(status_item, SendId, "setMenu:", ns_menu(self.menu));
-
 }
 
 fn bool Tray.loop(&self)
@@ -97,13 +85,14 @@ fn bool Tray.loop(&self)
         io::printfn("Event [type=%s]", objc::event_type_from(type)!!);
     }
 
-    return true; // true
+    return true;
 }
 
 fn ObjcId ns_menu(Menu[] ms)
 {
     ObjcId menu = objc::msg_send(objc::alloc(objc::getClass("NSMenu")), SendVoid, "init");
     objc::msg_send(menu, SendBool, "setAutoenablesItems:", false);
+
     foreach(m: ms) {
         if (m.text.str_view() == "-") {
             io::printn("add separator");
@@ -111,11 +100,21 @@ fn ObjcId ns_menu(Menu[] ms)
             objc::msg_send(menu, SendId, "addItem:", separator);
         } else { 
             io::printfn("add %s", m.text);
-            ObjcSelector menu_cb = objc::sel_registerName("menuCallback:");
             ObjcClass menu_item_cls = objc::getClass("NSMenuItem");
             ObjcId title = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", m.text);
             ObjcId menu_item = objc::msg_send(objc::alloc(menu_item_cls), SendVoid, "init");
             objc::msg_send(menu_item, SendId, "setTitle:", title);
+            objc::msg_send(menu_item, SendSelector, "setAction:", objc::sel_registerName("menuCallback:"));
+            // ObjcId menu_item = objc::msg_send(
+            //     objc::getClass("NSMenuItem"),
+            //     SendInitWithTitle,
+            //     "initWithTitle:action:keyEquivalent:",
+            //     objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", m.text),
+            //     objc::sel_registerName("menuCallback:"),
+            //     "",
+            // );
+
+
             objc::msg_send(menu_item, SendBool, "setEnabled:", !m.disabled);
             objc::msg_send(menu_item, SendInt, "setState:", m.checked ? 1 : 0);
             ObjcId value = objc::msg_send(objc::getClass("NSValue"), SendPtr, "valueWithPointer:", &m);
