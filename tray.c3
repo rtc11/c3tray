@@ -31,7 +31,9 @@ fn void menu_callback(ObjcId self, ObjcSelector sel, ObjcId sender)
 
     if(pointerValue) {
         Menu* menu = (Menu*) pointerValue;
-        io::printfn("%s [disabled:%d, checked:%d, checkbox:%d, cb:%s, sub_menu:%s]", title, menu.disabled, menu.checked, menu.checkbox, menu.cb, menu.sub_menu);
+        io::printfn("%s [disabled:%d, checked:%d, checkbox:%d, cb:%s, sub_menu:%s]", 
+            title, menu.disabled, menu.checked, menu.checkbox, menu.cb, menu.sub_menu);
+
         menu.cb(menu);
     }
 }
@@ -41,10 +43,8 @@ fn bool Tray.init(&self)
     ObjcClass delegate_cls = objc::allocateClassPair(objc::getClass("NSObject"), "AppDelegate", 0);
     objc::class_addMethod(delegate_cls , objc::sel_registerName("menuCallback:"), &menu_callback, "V@:@");
     ObjcId delegate = objc::msg_send(objc::alloc(delegate_cls), SendVoid, "init");
-
     app = objc::msg_send(objc::getClass("NSApplication"), SendVoid, "sharedApplication");
     objc::msg_send(app, SendId, "setDelegate:", delegate);
-
     ObjcId status_bar = objc::msg_send(objc::getClass("NSStatusBar"), SendVoid, "systemStatusBar");
     status_item = objc::msg_send(status_bar, SendDouble, "statusItemWithLength:", StatusItemLength.VARIABLE.val);
     self.update();
@@ -104,27 +104,27 @@ fn ObjcId ns_menu(Menu[] ms)
 
 fn void cb_hello(Menu *item)
 {
-    io::printfn("hello callback");
+    io::printfn("hello");
     tray.icon = TRAY_ICON;
     tray.update();
 }
 
 fn void cb_toggle(Menu *item)
 {
-    io::printfn("toggle callback");
+    io::printfn("toggle checked");
     item.checked = !item.checked;
     tray.update();
 }
 
 fn void cb_quit(Menu *item)
 {
-    io::printfn("quit callback");
+    io::printfn("quit");
     objc::msg_send(app, SendId, "terminate", app);
 }
 
 fn void cb_sub_menu(Menu *item)
 {
-    io::printfn("sub menu clicked on %s", item.text);
+    io::printn("sub menu");
     tray.update();
 }
 
@@ -142,19 +142,15 @@ Tray tray = {
                     { .text = "7", .cb = &cb_sub_menu },
                     { .text = "-" },
                     { .text = "8", .cb = &cb_sub_menu },
-                    // { .text = null },
                 }},
                 { .text = "Fourth", .sub_menu = &&Menu[] {
                     { .text = "5", .cb = &cb_sub_menu },
                     { .text = "6", .cb = &cb_sub_menu },
-                    // { .text = null },
                 }},
-                // { .text = null },
             }}
         }},
         { .text = "-" },
         { .text = "Quit", .cb = &cb_quit },
-        // { .text = null },
     }
 };
 
