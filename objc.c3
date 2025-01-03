@@ -34,8 +34,10 @@ fn ObjcClass* alloc(ObjcClass cls) => objc::msg_send(cls, SendVoid, "alloc");
 
 extern fn bool class_addIvar(ObjcClass cls, ZString name, int size, double alignment, ZString types) @extern("class_addIvar");
 extern fn bool class_addMethod(ObjcClass cls, ObjcSelector name, void* imp, ZString types) @extern("class_addMethod");
-extern fn ObjcIvar object_getIVar(ObjcId id, ZString name, void* outValue) @extern("object_getInstanceVariable");
-extern fn ObjcIvar object_setIVar(ObjcId id, ZString name, void* value) @extern("object_setInstanceVariable");
+extern fn ObjcIvar object_getIvar(ObjcId id, ZString name, void* outValue) @extern("object_getIvar");
+extern fn ObjcIvar object_setIvar(ObjcId id, ZString name, void* value) @extern("object_setIvar");
+extern fn ObjcIvar object_getInstanceVariable(ObjcId id, ZString name, void* outValue);
+extern fn ObjcIvar object_setInstanceVariable(ObjcId id, ZString name, void* value);
 extern fn ObjcClass allocateClassPair(ObjcClass cls, ZString name, uint extraBytes) @extern("objc_allocateClassPair");
 
 enum StatusItemLength : (double val)

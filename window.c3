@@ -15,7 +15,7 @@ fn void main()
     objc::class_addIvar(delegate_cls, "NSWindow", $sizeof(win), math::log2($sizeof(win)), "L");
     objc::class_addMethod(delegate_cls, objc::sel_registerName("windowWillResize:toSize:"), &resize_window, "{NSSize=ff}@:{NSSize=ff}");
     ObjcId delegate = objc::msg_send(objc::alloc(delegate_cls), SendVoid, "init");
-    objc::object_setIVar(delegate, "NSWindow", win);
+    objc::object_setInstanceVariable(delegate, "NSWindow", win);
     objc::msg_send(win, SendId, "setDelegate:", delegate);
     objc::msg_send(app, SendBool, "activateIgnoringOtherApps:", true);
     objc::msg_send(win, SendSelector, "makeKeyAndOrderFront:", null);
@@ -44,17 +44,18 @@ fn void main()
 
 fn bool on_close(void* self)
 {
+    io::printn("closing window..");
     ObjcClass* win;
-    objc::object_getIVar(self, "NSWindow", &win);
+    objc::object_getInstanceVariable(self, "NSWindow", &win);
     if (win == null) return true;
     running = false;
     return true;
 }
 
-fn Size resize_window(void* self, ObjcSelector name, Size frame)
+fn Size resize_window(void* self, Size frame)
 {
     ObjcClass* win;
-    objc::object_getIVar(self, "NSWindow", &win);
+    objc::object_getInstanceVariable(self, "NSWindow", &win);
     if (win == null) return frame;
 	io::printfn("window resized to %f %f", frame.width, frame.height);
     return frame;
