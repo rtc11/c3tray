@@ -20,8 +20,10 @@ struct Menu {
 }
 
 const ZString TRAY_ICON = "icon.png";
-ObjcId status_item;
 ObjcId app;
+ObjcId status_bar; 
+ObjcId status_item;
+bool running = true;
 
 fn void menu_callback(ObjcId self, ObjcSelector sel, ObjcId sender)
 {
@@ -45,7 +47,7 @@ fn bool Tray.init(&self)
     ObjcId delegate = objc::msg_send(objc::alloc(delegate_cls), SendVoid, "init");
     app = objc::msg_send(objc::getClass("NSApplication"), SendVoid, "sharedApplication");
     objc::msg_send(app, SendId, "setDelegate:", delegate);
-    ObjcId status_bar = objc::msg_send(objc::getClass("NSStatusBar"), SendVoid, "systemStatusBar");
+    status_bar = objc::msg_send(objc::getClass("NSStatusBar"), SendVoid, "systemStatusBar");
     status_item = objc::msg_send(status_bar, SendDouble, "statusItemWithLength:", StatusItemLength.VARIABLE.val);
     self.update();
     objc::msg_send(app, SendBool, "activateIgnoringOtherApps:", true);
@@ -65,7 +67,9 @@ fn bool Tray.loop(&self)
 {
     ObjcId loop = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", "kCFRunLoopDefaultMode");
     ObjcClass* event = objc::msg_send(app, SendDequeueEvent, "nextEventMatchingMask:untilDate:inMode:dequeue:", long.max, null, loop, true);
-    objc::msg_send(app, SendId, "sendEvent:", event);
+    if (event) {
+        objc::msg_send(app, SendId, "sendEvent:", event);
+    }
 
     // int type = objc::msg_send(event, GetInt, "type");
     // if (type != 0) io::printfn("Event [type=%s]", objc::event_type_from(type)!!);
@@ -91,7 +95,7 @@ fn ObjcId ns_menu(Menu[] ms)
             objc::msg_send(menu_item, SendSelector, "setAction:", objc::sel_registerName("menuCallback:"));
             objc::msg_send(menu_item, SendBool, "setEnabled:", !m.disabled);
             objc::msg_send(menu_item, SendInt, "setState:", m.checked ? 1 : 0);
-            ObjcId value = objc::msg_send(objc::getClass("NSValue"), SendPtr, "valueWithPointer:", &m);
+            ObjcId value = objc::msg_send(objc::getClass("NSValue"), SendPtr, "valueWithPointer:", @tclone(m));
             objc::msg_send(menu_item, SendId, "setRepresentedObject:", value);
             objc::msg_send(menu, SendId, "addItem:", menu_item);
             if (m.sub_menu) {
@@ -119,6 +123,7 @@ fn void cb_toggle(Menu *item)
 fn void cb_quit(Menu *item)
 {
     io::printfn("quit");
+    running = false;
     objc::msg_send(app, SendId, "terminate", app);
 }
 
@@ -158,7 +163,9 @@ fn void main()
 {
     @pool() {
         tray.init();
-        while(tray.loop());
+        while (tray.loop() && running) {
+            
+        };
     };
 }
 
