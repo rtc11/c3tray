@@ -1,0 +1,20 @@
+{
+  "targets": {
+    "tray": {
+      "type": "executable",
+      "sources": ["tray.c3", "objc.c3"],
+        "linked-libraries": [
+            "Foundation.framework",
+            "AppKit.framework",
+        ]
+    },
+    "window": {
+        "type": "executable",
+        "sources": ["window.c3", "objc.c3"],
+        "linked-libraries": [
+            "Foundation.framework",
+            "AppKit.framework",
+        ]
+    }
+  }
+}

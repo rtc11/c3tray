@@ -1,0 +1,15 @@
+# Ignore everything
+*
+
+# Except...
+!.gitignore
+!.gitattributes
+!*.c3
+!*.json
+!*.c
+!*.h
+!*.m
+!*.png
+!README.md
+!LICENSE
+
