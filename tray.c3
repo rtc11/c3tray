@@ -69,11 +69,13 @@ fn void Tray.update(&self)
     status_item.setMenu(ns_menu(self.menu));
 }
 
-fn bool Tray.loop(&self)
+fn bool Tray.loop(&self, bool blocking = true)
 {
+    NSDate date = NSDate { .cls = objc::getClass("NSDate")}; 
+    blocking ? date.distantFuture() : date.distantPast();
     NSString loop = NSString { .cls = objc::getClass("NSString") };
     loop.stringWithUTF8String("kCFRunLoopDefaultMode");
-    NSEvent event = app.nextEventMatchingMask(long.max, null, loop, true);
+    NSEvent event = app.nextEventMatchingMask(long.max, date, loop, true);
     if (event) {
         app.sendEvent(event);
     }

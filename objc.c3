@@ -105,9 +105,9 @@ fn void NSApplication.activateIgnoringOtherApps(&self, bool flag)
 }
 
 <* @require self.id `NSApplication is not initialized` *>
-fn NSEvent NSApplication.nextEventMatchingMask(&self, long mask, void* until_date, NSObject in_mode, bool dequeue)
+fn NSEvent NSApplication.nextEventMatchingMask(&self, long mask, NSDate until_date, NSObject in_mode, bool dequeue)
 {
-    return (NSEvent)objc::msg_send(self.id, SendDequeueEvent, "nextEventMatchingMask:untilDate:inMode:dequeue:", mask, until_date, in_mode.id, dequeue);
+    return (NSEvent)objc::msg_send(self.id, SendDequeueEvent, "nextEventMatchingMask:untilDate:inMode:dequeue:", mask, until_date.id, in_mode.id, dequeue);
 }
 
 <* @require self.id `NSApplication is not initialized` *>
@@ -253,6 +253,11 @@ fn void NSString.stringWithUTF8String(&self, ZString str)
 fn void NSDate.distantFuture(&self)
 {
     self.id = objc::msg_send(self.cls, SendVoid, "distantFuture");
+}
+
+fn void NSDate.distantPast(&self)
+{
+    self.id = objc::msg_send(self.cls, SendVoid, "distantPast");
 }
 
 <* @require self.id `NSWindow is not initialized` *>
