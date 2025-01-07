@@ -45,26 +45,27 @@ def NSDate = NSObject;
 distinct NSEvent = void*;
 distinct NSStatusBarItem = void*;
 
-// TODO: wait for @operator(construct) to be available (0.6.6?)
+// TODO: @operator(construct) is comming in 0.6.6
 // fn NSApplication NSApplication.new() @operator(construct)
 // {
 //     self.cls = get_class("NSApplication");
 //     return self;
 // }
 
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 def SendVoid = fn void*(void*, ObjcSelector);
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 extern fn ObjcClass allocateClassPair(ObjcClass cls, ZString name, uint extraBytes) @extern("objc_allocateClassPair");
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 extern fn bool class_addMethod(ObjcClass cls, ObjcSelector name, void* imp, ZString types);
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 extern fn ObjcIvar getInstanceVariable(ObjcId id, ZString name, void* outValue) @extern("object_getInstanceVariable");
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 extern fn ObjcIvar setInstanceVariable(ObjcId id, ZString name, void* value) @extern("object_setInstanceVariable");
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 extern fn bool class_addIvar(ObjcClass cls, ZString name, int size, double alignment, ZString types);
 
+<* @require self.id `self is not initialized` *>
 macro NSObject.call(&self, $FunctionType, ZString $selector, ...)
 {
 	return (($FunctionType)&objc::msgSend)((ObjcId)self.id, objc::sel_getUid($selector), $vasplat);
@@ -75,140 +76,200 @@ macro ObjcId.call(ObjcId self, $FunctionType, ZString $selector, ...)
 	return (($FunctionType)&objc::msgSend)(self, objc::sel_getUid($selector), $vasplat);
 }
 
-fn void NSObject.alloc_class_pair(&self, ZString name, uint extra_bytes) {
+fn void NSObject.alloc_class_pair(&self, ZString name, uint extra_bytes)
+{
     self.cls = allocateClassPair(self.cls, name, extra_bytes);
 }
 
-fn void NSApplication.sharedApplication(&self) {
+fn void NSApplication.sharedApplication(&self)
+{
     self.id = objc::msg_send(self.cls, SendVoid, "sharedApplication"); 
 }
-fn void NSApplication.setDelegate(self, NSObject delegate) {
-    if (!self.id) io::printfn("NSApplication is not initialized");
+
+<* @require self.id `NSApplication is not initialized` *>
+fn void NSApplication.setDelegate(&self, NSObject delegate)
+{
     objc::msg_send(self.id, SendId, "setDelegate:", delegate.id);
 }
-fn void NSApplication.terminate(&self) {
-    if (!self.id) io::printfn("NSApplication is not initialized");
+
+<* @require self.id `NSApplication is not initialized` *>
+fn void NSApplication.terminate(&self)
+{
     objc::msg_send(self.id, SendId, "terminate:", self.id);
 }
-fn void NSApplication.activateIgnoringOtherApps(&self, bool flag) {
-    if (!self.id) io::printfn("NSApplication is not initialized");
+
+<* @require self.id `NSApplication is not initialized` *>
+fn void NSApplication.activateIgnoringOtherApps(&self, bool flag)
+{
     objc::msg_send(self.id, SendBool, "activateIgnoringOtherApps:", flag);
 }
-fn NSEvent NSApplication.nextEventMatchingMask(&self, long mask, void* until_date, NSObject in_mode, bool dequeue) {
-    if (!self.id) io::printfn("NSApplication is not initialized");
+
+<* @require self.id `NSApplication is not initialized` *>
+fn NSEvent NSApplication.nextEventMatchingMask(&self, long mask, void* until_date, NSObject in_mode, bool dequeue)
+{
     return (NSEvent)objc::msg_send(self.id, SendDequeueEvent, "nextEventMatchingMask:untilDate:inMode:dequeue:", mask, until_date, in_mode.id, dequeue);
 }
-fn void NSApplication.finishLaunching(&self) {
-    if (!self.id) io::printfn("NSApplication is not initialized");
+
+<* @require self.id `NSApplication is not initialized` *>
+fn void NSApplication.finishLaunching(&self)
+{
     objc::msg_send(self.id, SendVoid, "finishLaunching");
 }
-fn void NSApplication.updateWindows(&self) {
-    if (!self.id) io::printfn("NSApplication is not initialized");
+
+<* @require self.id `NSApplication is not initialized` *>
+fn void NSApplication.updateWindows(&self)
+{
     objc::msg_send(self.id, SendVoid, "updateWindows");
 }
 
-fn NSPoint NSEvent.locationInWindow(self) {
-    return objc::msg_send(self, GetPoint, "locationInWindow");
-}
-fn int NSEvent.get_type(self) {
-    return objc::msg_send(self, GetInt, "type");
-}
-fn int NSEvent.get_modifierFlags(self) {
-    return objc::msg_send(self, GetInt, "modifierFlags");
-}
+fn NSPoint NSEvent.locationInWindow(self) => objc::msg_send(self, GetPoint, "locationInWindow");
+fn int NSEvent.get_type(self) => objc::msg_send(self, GetInt, "type");
+fn int NSEvent.get_modifierFlags(self) => objc::msg_send(self, GetInt, "modifierFlags");
 
-fn void NSApplication.sendEvent(&self, NSEvent event) {
-    if (!self.id) io::printfn("NSApplication is not initialized");
+<* @require self.id `NSApplication is not initialized` *>
+fn void NSApplication.sendEvent(&self, NSEvent event)
+{
     objc::msg_send(self.id, SendEvent, "sendEvent:", event);
 }
-fn void NSApplication.setActivationPolicy(&self, ApplicationActivationPolicy policy) { 
+
+<* @require self.id `NSApplication is not initialized` *>
+fn void NSApplication.setActivationPolicy(&self, ApplicationActivationPolicy policy)
+{ 
     objc::msg_send(self.id, SendInt, "setActivationPolicy:", policy.val);
 }
 
-fn void NSStatusBar.systemStatusBar(&self) {
+fn void NSStatusBar.systemStatusBar(&self)
+{
     self.id = objc::msg_send(self.cls, SendVoid, "systemStatusBar");
 }
 
-macro NSStatusBarItem NSStatusBar.statusItemWithLength(NSStatusBar self, StatusItemLength length)  {
-    if (!self.id) io::printfn("NSStatusBar is not initialized");
+<* @require self.id `NSStatusBar is not initialized` *>
+macro NSStatusBarItem NSStatusBar.statusItemWithLength(NSStatusBar self, StatusItemLength length)
+{
     return (NSStatusBarItem)objc::msg_send(self.id, SendDouble, "statusItemWithLength:", length.val);
 }
-fn void NSStatusBarItem.setImage(self, NSImage img) {
+
+<* @require img.id `NSImage is not initialized` *>
+fn void NSStatusBarItem.setImage(self, NSImage img)
+{
     objc::msg_send(self, SendId, "setImage:", img.id);
 }
-fn void NSStatusBarItem.setMenu(self, NSMenu menu) {
+
+<* @require menu.id `NSMenu is not initialized` *>
+fn void NSStatusBarItem.setMenu(self, NSMenu menu)
+{
     objc::msg_send(self, SendId, "setMenu:", menu.id);
 }
-fn void NSImage.initWithContentsOfFile(&self, NSString str) {
-    if (!self.id) io::printfn("cant init before you alloc");
+
+<* 
+    @require self.id `NSImage is not allocated` 
+    @require str.id `NSSTring is not initialized` 
+*>
+fn void NSImage.initWithContentsOfFile(&self, NSString str)
+{
     self.id = objc::msg_send(self.id, SendId, "initWithContentsOfFile:", str.id);
 }
-fn void NSImage.setSize(&self, NSSize size) {
-    if (!self.id) io::printfn("NSImage is not initialized");
+
+<* @require self.id `NSImage is not initialized` *>
+fn void NSImage.setSize(&self, NSSize size)
+{
     objc::msg_send(self.id, SendSize, "setSize:", size);
 }
 
-fn void NSObject.init(&self) {
-    if (!self.id) io::printfn("cant init before you alloc");
+<* @require self.id `NSObject is not allocated` *>
+fn void NSObject.init(&self)
+{
     self.id = objc::msg_send(self.id, SendVoid, "init");
 }
-fn void NSMenu.setAutoenablesItems(&self, bool flag) {
-    if (!self.id) io::printfn("NSMenu is not initialized");
+
+<* @require self.id `NSMenu is not initialized` *>
+fn void NSMenu.setAutoenablesItems(&self, bool flag)
+{
     objc::msg_send(self.id, SendBool, "setAutoenablesItems:", flag);
 }
-fn void NSMenu.addItem(&self, NSMenuItem item) {
-    if (!self.id) io::printfn("NSMenu is not initialized");
+
+<* @require self.id `NSMenu is not initialized` *>
+fn void NSMenu.addItem(&self, NSMenuItem item)
+{
     objc::msg_send(self.id, SendId, "addItem:", item.id);
 }
-fn void NSMenu.setSubmenu(&self, NSMenu menu, NSMenuItem item) {
-    if (!self.id) io::printfn("NSMenu is not initialized");
+
+<* @require self.id `NSMenu is not initialized` *>
+fn void NSMenu.setSubmenu(&self, NSMenu menu, NSMenuItem item)
+{
     objc::msg_send(self.id, SendIdId, "setSubmenu:forItem:", menu.id, item.id);
 }
-fn void NSMenuItem.separatorItem(&self) {
+
+fn void NSMenuItem.separatorItem(&self)
+{
     self.id = objc::msg_send(self.cls, SendVoid, "separatorItem");
 }
+
+<* 
+    @require self.id `NSMenuItem is not initialized` 
+    @require value.id `NSValue is not initialized` 
+*>
 fn void NSMenuItem.setRepresentedObject(&self, NSValue value) {
-    if (!self.id) io::printfn("NSMenuItem is not initialized");
     objc::msg_send(self.id, SendId, "setRepresentedObject:", value.id);
 }
-fn void NSMenuItem.setState(&self, bool flag) {
-    if (!self.id) io::printfn("NSMenuItem is not initialized");
+
+<* @require self.id `NSMenuItem is not initialized` *>
+fn void NSMenuItem.setState(&self, bool flag)
+{
     objc::msg_send(self.id, SendInt, "setState:", flag ? 1 : 0);
 }
-fn void NSMenuItem.setEnabled(&self, bool flag) {
-    if (!self.id) io::printfn("NSMenuItem is not initialized");
+
+<* @require self.id `NSMenuItem is not initialized` *>
+fn void NSMenuItem.setEnabled(&self, bool flag)
+{
     objc::msg_send(self.id, SendBool, "setEnabled:", flag);
 }
-fn void NSMenuItem.setTitle(&self, NSString title) {
-    if (!self.id) io::printfn("NSMenuItem is not initialized");
+
+<* 
+    @require self.id `NSMenuItem is not initialized` 
+    @require title.id `NSString is not initialized` 
+*>
+fn void NSMenuItem.setTitle(&self, NSString title)
+{
     objc::msg_send(self.id, SendId, "setTitle:", title.id);
 }
-fn void NSMenuItem.setAction(&self, ObjcSelector action) {
-    if (!self.id) io::printfn("NSMenuItem is not initialized");
+
+<* @require self.id `NSMenuItem is not initialized` *>
+fn void NSMenuItem.setAction(&self, ObjcSelector action)
+{
     objc::msg_send(self.id, SendSelector, "setAction:", action);
 }
 
-fn void NSValue.valueWithPointer(&self, void* ptr) {
+fn void NSValue.valueWithPointer(&self, void* ptr)
+{
     self.id = objc::msg_send(self.cls, SendPtr, "valueWithPointer:", ptr);
 }
-fn void NSString.stringWithUTF8String(&self, ZString str) {
+
+fn void NSString.stringWithUTF8String(&self, ZString str)
+{
     self.id = objc::msg_send(self.cls, SendString, "stringWithUTF8String:", str);
 }
 
-fn void NSDate.distantFuture(&self) {
+fn void NSDate.distantFuture(&self)
+{
     self.id = objc::msg_send(self.cls, SendVoid, "distantFuture");
 }
 
-fn void NSWindow.initWithContentRect(&self, NSRect rect, ulong style_mask, ulong backing, bool is_defer) {
-    if (!self.id) io::printfn("NSWindow not initialized"); 
+<* @require self.id `NSWindow is not initialized` *>
+fn void NSWindow.initWithContentRect(&self, NSRect rect, ulong style_mask, ulong backing, bool is_defer)
+{
     self.id = objc::msg_send(self.id, SendContentRec, "initWithContentRect:styleMask:backing:defer:", rect, style_mask, backing, is_defer);
 }
-fn void NSWindow.makeKeyAndOrderFront(&self, ObjcSelector sel) {
-    if (!self.id) io::printfn("WARN: NSWindow not initialized"); 
+
+<* @require self.id `NSWindow is not initialized` *>
+fn void NSWindow.makeKeyAndOrderFront(&self, ObjcSelector sel)
+{
     objc::msg_send(self.id, SendSelector, "makeKeyAndOrderFront:", sel);
 }
-fn void NSWindow.setIsVisible(&self, bool flag) {
-    if (!self.id) io::printfn("WARN: NSWindow not initialized"); 
+
+<* @require self.id `NSWindow is not initialized` *>
+fn void NSWindow.setIsVisible(&self, bool flag)
+{
     objc::msg_send(self.id, SendBool, "setIsVisible:", flag);
 }
 
@@ -216,14 +277,18 @@ fn NSObject alloc(NSObject object) {
     object.id = objc::msg_send(object.cls, SendVoid, "alloc");
     return object;
 }
-fn void release(NSObject object) {
-    objc::msg_send(object.cls, SendVoid, "release");
+
+<* @require object.id `NSObject is not allocated` *>
+fn void release(NSObject object)
+{
+    objc::msg_send(object.id, SendVoid, "release");
 }
 
-macro void! NSObject.add_method(NSObject self, ZString name, void* imp, ZString types = "")
+<* @require self.id == null `NSObject is already initialized` *>
+macro NSObject! NSObject.add_method(NSObject self, ZString name, void* imp, ZString types = "")
 {
-    if(self.id) return ObjcFault.CLASS_INSTANTIATED?;
     if(!class_addMethod(self.cls, objc::sel_registerName(name), imp, types)) return ObjcFault.METHOD_NOT_SET?;
+    return self;
 }
 
 macro ObjcClass! ObjcClass.add_method(ObjcClass self, ZString name, void* imp, ZString types = "") 
@@ -245,6 +310,7 @@ macro ObjcIvar! ObjcId.get_ivar(ObjcId self, ZString name)
     return out;
 }
 
+<* @require self.id `NSObject is not initialized` *>
 macro void NSObject.setInstanceVariable(NSObject self, ZString name, NSObject out)
 {
     setInstanceVariable(self.id, name, out.id);
@@ -266,14 +332,14 @@ struct NSRect {
 }
 
 
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 enum StatusItemLength : (double val)
 {
     VARIABLE = -1.0,
     SQUARE   = -2.0,
 }
 
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 enum ApplicationActivationPolicy : (int val)
 {
 	REGULAR    = 0,
@@ -281,7 +347,7 @@ enum ApplicationActivationPolicy : (int val)
 	PROHIBITED = 2,
 }
 
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 enum WindowStyleMask : (int val)
 {
     BORDERLESS                = 0,
@@ -299,7 +365,7 @@ enum WindowStyleMask : (int val)
 	HUD_WINDOW                = 1 << 13
 }
 
-// DEPRECATED 
+// DEPRECATED: in c3c v0.6.6 
 enum BackingStore : (int val)
 {
 	RETAINED    = 0,
@@ -307,7 +373,7 @@ enum BackingStore : (int val)
 	BUFFERED    = 2
 }
 
-// DEPRECATED
+// DEPRECATED: in c3c v0.6.6 
 enum EventType : (long val)
 {
 	LEFT_MOUSE_DOWN     = 1,
@@ -346,7 +412,7 @@ enum EventType : (long val)
 	CHANGE_MODE         = 38,
 }
 
-// DEPRECATED
+// DEPRECATED: in c3c v0.6.6 
 fn EventType! event_type_from(int val)
 {
     switch(val) {
@@ -388,7 +454,7 @@ fn EventType! event_type_from(int val)
     }
 }
 
-// DEPRECATED
+// DEPRECATED: in c3c v0.6.6 
 enum EventModifierFlag : (int val)
 {
 	CAPS_LOCK   = 1 << 16,
@@ -401,7 +467,7 @@ enum EventModifierFlag : (int val)
 	HELP        = 1 << 22,
 }
 
-// DEPRECATED
+// DEPRECATED: in c3c v0.6.6 
 fn String modifier_to_str(int modifier) 
 {
     DString result;
