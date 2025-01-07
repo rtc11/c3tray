@@ -1,58 +1,287 @@
-module objc;
-
+module objc @if(env::DARWIN);
 import std::os::macos::objc;
 import std::io;
 import std::math;
 
-def SendId = fn void*(void*, ObjcSelector, ObjcId);
-def SendVoid = fn void*(void*, ObjcSelector);
 def SendBool = fn void*(void*, ObjcSelector, bool);
-def SendPtr = fn void*(void*, ObjcSelector, void*);
-def SendInt = fn void*(void*, ObjcSelector, int);
-def SendDouble = fn void*(void*, ObjcSelector, double);
-def SendString = fn void*(void*, ObjcSelector, ZString);
-def SendSelector = fn void*(void*, ObjcSelector, ObjcSelector);
-def SendContentRec = fn void*(void*, ObjcSelector, Rect, long, long, bool);
+def SendContentRec = fn void*(void*, ObjcSelector, NSRect, long, long, bool);
 def SendDequeueEvent = fn void*(void*, ObjcSelector, long, void*, ObjcId, bool);
+def SendDouble = fn void*(void*, ObjcSelector, double);
+def SendEvent = fn void*(void*, ObjcSelector, NSEvent);
+def SendId = fn void*(void*, ObjcSelector, ObjcId);
+def SendIdId = fn void*(void*, ObjcSelector, ObjcId, ObjcId);
+def SendInt = fn void*(void*, ObjcSelector, int);
+def SendPtr = fn void*(void*, ObjcSelector, void*);
+def SendSelector = fn void*(void*, ObjcSelector, ObjcSelector);
+def SendSize = fn void*(void*, ObjcSelector, NSSize);
+def SendString = fn void*(void*, ObjcSelector, ZString);
 def GetInt = fn int(void*, ObjcSelector);
-def GetPoint = fn Point(void*, ObjcSelector);
+def GetPoint = fn NSPoint(void*, ObjcSelector);
 
-struct Point {
+fault ObjcFault {
+    UNKNOWN_EVENT,
+    CLASS_NOT_FOUND,
+    IVAR_NOT_SET,
+    IVAR_NOT_FOUND,
+    METHOD_NOT_SET,
+    CLASS_INSTANTIATED,
+}
+
+struct NSObject {
+    ObjcClass cls;
+    ObjcId *id;
+}
+
+def NSApplication = NSObject;
+def NSStatusBar = NSObject;
+def NSImage = NSObject;
+def NSMenu = NSObject;
+def NSMenuItem = NSObject;
+def NSString = NSObject;
+def NSWindow = NSObject;
+def NSAutoreleasePool = NSObject;
+def NSValue = NSObject;
+def NSDate = NSObject;
+distinct NSEvent = void*;
+distinct NSStatusBarItem = void*;
+
+// TODO: wait for @operator(construct) to be available (0.6.6?)
+// fn NSApplication NSApplication.new() @operator(construct)
+// {
+//     self.cls = get_class("NSApplication");
+//     return self;
+// }
+
+// DEPRECATED 
+def SendVoid = fn void*(void*, ObjcSelector);
+// DEPRECATED 
+extern fn ObjcClass allocateClassPair(ObjcClass cls, ZString name, uint extraBytes) @extern("objc_allocateClassPair");
+// DEPRECATED 
+extern fn bool class_addMethod(ObjcClass cls, ObjcSelector name, void* imp, ZString types);
+// DEPRECATED 
+extern fn ObjcIvar getInstanceVariable(ObjcId id, ZString name, void* outValue) @extern("object_getInstanceVariable");
+// DEPRECATED 
+extern fn ObjcIvar setInstanceVariable(ObjcId id, ZString name, void* value) @extern("object_setInstanceVariable");
+// DEPRECATED 
+extern fn bool class_addIvar(ObjcClass cls, ZString name, int size, double alignment, ZString types);
+
+macro NSObject.call(&self, $FunctionType, ZString $selector, ...)
+{
+	return (($FunctionType)&objc::msgSend)((ObjcId)self.id, objc::sel_getUid($selector), $vasplat);
+}
+
+macro ObjcId.call(ObjcId self, $FunctionType, ZString $selector, ...)
+{
+	return (($FunctionType)&objc::msgSend)(self, objc::sel_getUid($selector), $vasplat);
+}
+
+fn void NSObject.alloc_class_pair(&self, ZString name, uint extra_bytes) {
+    self.cls = allocateClassPair(self.cls, name, extra_bytes);
+}
+
+fn void NSApplication.sharedApplication(&self) {
+    self.id = objc::msg_send(self.cls, SendVoid, "sharedApplication"); 
+}
+fn void NSApplication.setDelegate(self, NSObject delegate) {
+    if (!self.id) io::printfn("NSApplication is not initialized");
+    objc::msg_send(self.id, SendId, "setDelegate:", delegate.id);
+}
+fn void NSApplication.terminate(&self) {
+    if (!self.id) io::printfn("NSApplication is not initialized");
+    objc::msg_send(self.id, SendId, "terminate:", self.id);
+}
+fn void NSApplication.activateIgnoringOtherApps(&self, bool flag) {
+    if (!self.id) io::printfn("NSApplication is not initialized");
+    objc::msg_send(self.id, SendBool, "activateIgnoringOtherApps:", flag);
+}
+fn NSEvent NSApplication.nextEventMatchingMask(&self, long mask, void* until_date, NSObject in_mode, bool dequeue) {
+    if (!self.id) io::printfn("NSApplication is not initialized");
+    return (NSEvent)objc::msg_send(self.id, SendDequeueEvent, "nextEventMatchingMask:untilDate:inMode:dequeue:", mask, until_date, in_mode.id, dequeue);
+}
+fn void NSApplication.finishLaunching(&self) {
+    if (!self.id) io::printfn("NSApplication is not initialized");
+    objc::msg_send(self.id, SendVoid, "finishLaunching");
+}
+fn void NSApplication.updateWindows(&self) {
+    if (!self.id) io::printfn("NSApplication is not initialized");
+    objc::msg_send(self.id, SendVoid, "updateWindows");
+}
+
+fn NSPoint NSEvent.locationInWindow(self) {
+    return objc::msg_send(self, GetPoint, "locationInWindow");
+}
+fn int NSEvent.get_type(self) {
+    return objc::msg_send(self, GetInt, "type");
+}
+fn int NSEvent.get_modifierFlags(self) {
+    return objc::msg_send(self, GetInt, "modifierFlags");
+}
+
+fn void NSApplication.sendEvent(&self, NSEvent event) {
+    if (!self.id) io::printfn("NSApplication is not initialized");
+    objc::msg_send(self.id, SendEvent, "sendEvent:", event);
+}
+fn void NSApplication.setActivationPolicy(&self, ApplicationActivationPolicy policy) { 
+    objc::msg_send(self.id, SendInt, "setActivationPolicy:", policy.val);
+}
+
+fn void NSStatusBar.systemStatusBar(&self) {
+    self.id = objc::msg_send(self.cls, SendVoid, "systemStatusBar");
+}
+
+macro NSStatusBarItem NSStatusBar.statusItemWithLength(NSStatusBar self, StatusItemLength length)  {
+    if (!self.id) io::printfn("NSStatusBar is not initialized");
+    return (NSStatusBarItem)objc::msg_send(self.id, SendDouble, "statusItemWithLength:", length.val);
+}
+fn void NSStatusBarItem.setImage(self, NSImage img) {
+    objc::msg_send(self, SendId, "setImage:", img.id);
+}
+fn void NSStatusBarItem.setMenu(self, NSMenu menu) {
+    objc::msg_send(self, SendId, "setMenu:", menu.id);
+}
+fn void NSImage.initWithContentsOfFile(&self, NSString str) {
+    if (!self.id) io::printfn("cant init before you alloc");
+    self.id = objc::msg_send(self.id, SendId, "initWithContentsOfFile:", str.id);
+}
+fn void NSImage.setSize(&self, NSSize size) {
+    if (!self.id) io::printfn("NSImage is not initialized");
+    objc::msg_send(self.id, SendSize, "setSize:", size);
+}
+
+fn void NSObject.init(&self) {
+    if (!self.id) io::printfn("cant init before you alloc");
+    self.id = objc::msg_send(self.id, SendVoid, "init");
+}
+fn void NSMenu.setAutoenablesItems(&self, bool flag) {
+    if (!self.id) io::printfn("NSMenu is not initialized");
+    objc::msg_send(self.id, SendBool, "setAutoenablesItems:", flag);
+}
+fn void NSMenu.addItem(&self, NSMenuItem item) {
+    if (!self.id) io::printfn("NSMenu is not initialized");
+    objc::msg_send(self.id, SendId, "addItem:", item.id);
+}
+fn void NSMenu.setSubmenu(&self, NSMenu menu, NSMenuItem item) {
+    if (!self.id) io::printfn("NSMenu is not initialized");
+    objc::msg_send(self.id, SendIdId, "setSubmenu:forItem:", menu.id, item.id);
+}
+fn void NSMenuItem.separatorItem(&self) {
+    self.id = objc::msg_send(self.cls, SendVoid, "separatorItem");
+}
+fn void NSMenuItem.setRepresentedObject(&self, NSValue value) {
+    if (!self.id) io::printfn("NSMenuItem is not initialized");
+    objc::msg_send(self.id, SendId, "setRepresentedObject:", value.id);
+}
+fn void NSMenuItem.setState(&self, bool flag) {
+    if (!self.id) io::printfn("NSMenuItem is not initialized");
+    objc::msg_send(self.id, SendInt, "setState:", flag ? 1 : 0);
+}
+fn void NSMenuItem.setEnabled(&self, bool flag) {
+    if (!self.id) io::printfn("NSMenuItem is not initialized");
+    objc::msg_send(self.id, SendBool, "setEnabled:", flag);
+}
+fn void NSMenuItem.setTitle(&self, NSString title) {
+    if (!self.id) io::printfn("NSMenuItem is not initialized");
+    objc::msg_send(self.id, SendId, "setTitle:", title.id);
+}
+fn void NSMenuItem.setAction(&self, ObjcSelector action) {
+    if (!self.id) io::printfn("NSMenuItem is not initialized");
+    objc::msg_send(self.id, SendSelector, "setAction:", action);
+}
+
+fn void NSValue.valueWithPointer(&self, void* ptr) {
+    self.id = objc::msg_send(self.cls, SendPtr, "valueWithPointer:", ptr);
+}
+fn void NSString.stringWithUTF8String(&self, ZString str) {
+    self.id = objc::msg_send(self.cls, SendString, "stringWithUTF8String:", str);
+}
+
+fn void NSDate.distantFuture(&self) {
+    self.id = objc::msg_send(self.cls, SendVoid, "distantFuture");
+}
+
+fn void NSWindow.initWithContentRect(&self, NSRect rect, ulong style_mask, ulong backing, bool is_defer) {
+    if (!self.id) io::printfn("NSWindow not initialized"); 
+    self.id = objc::msg_send(self.id, SendContentRec, "initWithContentRect:styleMask:backing:defer:", rect, style_mask, backing, is_defer);
+}
+fn void NSWindow.makeKeyAndOrderFront(&self, ObjcSelector sel) {
+    if (!self.id) io::printfn("WARN: NSWindow not initialized"); 
+    objc::msg_send(self.id, SendSelector, "makeKeyAndOrderFront:", sel);
+}
+fn void NSWindow.setIsVisible(&self, bool flag) {
+    if (!self.id) io::printfn("WARN: NSWindow not initialized"); 
+    objc::msg_send(self.id, SendBool, "setIsVisible:", flag);
+}
+
+fn NSObject alloc(NSObject object) {
+    object.id = objc::msg_send(object.cls, SendVoid, "alloc");
+    return object;
+}
+fn void release(NSObject object) {
+    objc::msg_send(object.cls, SendVoid, "release");
+}
+
+macro void! NSObject.add_method(NSObject self, ZString name, void* imp, ZString types = "")
+{
+    if(self.id) return ObjcFault.CLASS_INSTANTIATED?;
+    if(!class_addMethod(self.cls, objc::sel_registerName(name), imp, types)) return ObjcFault.METHOD_NOT_SET?;
+}
+
+macro ObjcClass! ObjcClass.add_method(ObjcClass self, ZString name, void* imp, ZString types = "") 
+{
+    if(!class_addMethod(self, register_name(name), imp, types)) return ObjcFault.METHOD_NOT_SET?;
+    return self;
+}
+
+macro NSObject! NSObject.add_ivar(NSObject self, ZString name, int size, double alignment, ZString types) 
+{
+    if(!class_addIvar(self.cls, name, size, alignment, types)) return ObjcFault.IVAR_NOT_SET?;
+    return self;
+}
+
+macro ObjcIvar! ObjcId.get_ivar(ObjcId self, ZString name)
+{
+    ObjcIvar out;
+    if(!getInstanceVariable(self, name, &out)) return ObjcFault.IVAR_NOT_FOUND?; 
+    return out;
+}
+
+macro void NSObject.setInstanceVariable(NSObject self, ZString name, NSObject out)
+{
+    setInstanceVariable(self.id, name, out.id);
+}
+
+struct NSPoint {
     double x;
     double y;
 }
-struct Size {
+
+struct NSSize {
     double width;
     double height;
 }
-struct Rect {
-    Point origin;
-    Size size;
+
+struct NSRect {
+    NSPoint origin;
+    NSSize size;
 }
 
-fn ObjcClass* alloc(ObjcClass cls) => objc::msg_send(cls, SendVoid, "alloc");
 
-extern fn bool class_addIvar(ObjcClass cls, ZString name, int size, double alignment, ZString types) @extern("class_addIvar");
-extern fn bool class_addMethod(ObjcClass cls, ObjcSelector name, void* imp, ZString types) @extern("class_addMethod");
-extern fn ObjcIvar object_getIvar(ObjcId id, ZString name, void* outValue) @extern("object_getIvar");
-extern fn ObjcIvar object_setIvar(ObjcId id, ZString name, void* value) @extern("object_setIvar");
-extern fn ObjcIvar object_getInstanceVariable(ObjcId id, ZString name, void* outValue);
-extern fn ObjcIvar object_setInstanceVariable(ObjcId id, ZString name, void* value);
-extern fn ObjcClass allocateClassPair(ObjcClass cls, ZString name, uint extraBytes) @extern("objc_allocateClassPair");
-
+// DEPRECATED 
 enum StatusItemLength : (double val)
 {
     VARIABLE = -1.0,
-    SQUARE = -2.0,
+    SQUARE   = -2.0,
 }
 
+// DEPRECATED 
 enum ApplicationActivationPolicy : (int val)
 {
-	REGULAR = 0,
-	ACCESSORY = 1,
+	REGULAR    = 0,
+	ACCESSORY  = 1,
 	PROHIBITED = 2,
 }
 
+// DEPRECATED 
 enum WindowStyleMask : (int val)
 {
     BORDERLESS                = 0,
@@ -60,7 +289,7 @@ enum WindowStyleMask : (int val)
     CLOSABLE                  = 1 << 1,
 	MINIATURIZABLE            = 1 << 2,
 	RESIZABLE                 = 1 << 3,
-	TEXTURED_BACKGROUND       = 1 << 8, /* deprecated */
+	TEXTURED_BACKGROUND       = 1 << 8,
 	UNIFIED_TITLE_AND_TOOLBAR = 1 << 12,
 	FULL_SCREEN               = 1 << 14,
 	FULL_SIZE_CONTENT_VIEW    = 1 << 15,
@@ -70,6 +299,7 @@ enum WindowStyleMask : (int val)
 	HUD_WINDOW                = 1 << 13
 }
 
+// DEPRECATED 
 enum BackingStore : (int val)
 {
 	RETAINED    = 0,
@@ -77,6 +307,7 @@ enum BackingStore : (int val)
 	BUFFERED    = 2
 }
 
+// DEPRECATED
 enum EventType : (long val)
 {
 	LEFT_MOUSE_DOWN     = 1,
@@ -115,10 +346,7 @@ enum EventType : (long val)
 	CHANGE_MODE         = 38,
 }
 
-fault FromFault {
-    NO_CONVERSION
-}
-
+// DEPRECATED
 fn EventType! event_type_from(int val)
 {
     switch(val) {
@@ -156,59 +384,24 @@ fn EventType! event_type_from(int val)
         case EventType.PRESSURE.val:            return PRESSURE;
         case EventType.DIRECT_TOUCH.val:        return DIRECT_TOUCH;
         case EventType.CHANGE_MODE.val:         return CHANGE_MODE;
-        default: return FromFault.NO_CONVERSION?;
+        default: return ObjcFault.UNKNOWN_EVENT?;
     }
 }
 
-enum EventMask : (long val)
-{
-	LEFT_MOUSE_DOWN     = 1 << EventType.LEFT_MOUSE_DOWN.val,
-	LEFT_MOUSE_UP       = 1 << EventType.LEFT_MOUSE_UP.val,
-	RIGHT_MOUSE_DOWN    = 1 << EventType.RIGHT_MOUSE_DOWN.val,
-    RIGHT_MOUSE_UP      = 1 << EventType.RIGHT_MOUSE_UP.val,
-    MOUSE_MOVED         = 1 << EventType.MOUSE_MOVED.val,
-	LEFT_MOUSE_DRAGGED  = 1 << EventType.LEFT_MOUSE_DRAGGED.val,
-	RIGHT_MOUSE_DRAGGED = 1 << EventType.RIGHT_MOUSE_DRAGGED.val,
-	MOUSE_ENTERED       = 1 << EventType.MOUSE_ENTERED.val,
-	MOUSE_EXITED        = 1 << EventType.MOUSE_EXITED.val,
-	KEY_DOWN            = 1 << EventType.KEY_DOWN.val,
-	KEY_UP              = 1 << EventType.KEY_UP.val,
-	FLAGS_CHANGED       = 1 << EventType.FLAGS_CHANGED.val,
-	APPKIT_DEFINED      = 1 << EventType.APPKIT_DEFINED.val,
-	SYSTEM_DEFINED      = 1 << EventType.SYSTEM_DEFINED.val,
-	APPLICATION_DEFINED = 1 << EventType.APPLICATION_DEFINED.val,
-	PERIODIC            = 1 << EventType.PERIODIC.val,
-	CURSOR_UPDATE       = 1 << EventType.CURSOR_UPDATE.val,
-	SCROLL_WHEEL        = 1 << EventType.SCROLL_WHEEL.val,
-	TABLET_POINT        = 1 << EventType.TABLET_POINT.val,
-	TABLET_PROXIMITY    = 1 << EventType.TABLET_PROXIMITY.val,
-	OTHER_MOUSE_DOWN    = 1 << EventType.OTHER_MOUSE_DOWN.val,
-	OTHER_MOUSE_UP      = 1 << EventType.OTHER_MOUSE_UP.val,
-	OTHER_MOUSE_DRAGGED = 1 << EventType.OTHER_MOUSE_DRAGGED.val,
-
-    GESTURE             = 1 << EventType.GESTURE.val,
-    MAGNIFY             = 1 << EventType.MAGNIFY.val,
-    SWIPE               = 1 << EventType.SWIPE.val,
-    ROTATE              = 1 << EventType.ROTATE.val,
-    BEGIN_GESTURE       = 1 << EventType.BEGIN_GESTURE.val,
-    END_GESTURE         = 1 << EventType.END_GESTURE.val,
-    SMART_MAGNIFY       = 1L << EventType.SMART_MAGNIFY.val,
-    DIRECT_TOUCH        = 1L << EventType.DIRECT_TOUCH.val,
-    ANY                 = long.max,
-}
-
+// DEPRECATED
 enum EventModifierFlag : (int val)
 {
-	CAPS_LOCK   = 1 << 16, // Set if Caps Lock key is pressed.
-	SHIFT       = 1 << 17, // Set if Shift key is pressed.
-	CONTROL     = 1 << 18, // Set if Control key is pressed.
-	OPTION      = 1 << 19, // Set if Option or Alternate key is pressed.
-	COMMAND     = 1 << 20, // Set if Command key is pressed.
-	NUMERIC_PAD = 1 << 21, // Set if any key in the numeric keypad is pressed.
-    FUNCTION    = 1 << 23, // Set if any function key is pressed.
-	HELP        = 1 << 22, // Set if the Help key is pressed.
+	CAPS_LOCK   = 1 << 16,
+	SHIFT       = 1 << 17,
+	CONTROL     = 1 << 18,
+	OPTION      = 1 << 19,
+	COMMAND     = 1 << 20,
+	NUMERIC_PAD = 1 << 21,
+    FUNCTION    = 1 << 23,
+	HELP        = 1 << 22,
 }
 
+// DEPRECATED
 fn String modifier_to_str(int modifier) 
 {
     DString result;

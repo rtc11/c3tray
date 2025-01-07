@@ -6,57 +6,67 @@ bool running = true;
 
 fn void main()
 {
-    objc::class_addMethod(objc::getClass("NSObject"), objc::sel_registerName("windowShouldClose:"), &on_close, "");
-    ObjcClass* app = objc::msg_send(objc::getClass("NSApplication"), SendVoid, "sharedApplication");
-    objc::msg_send(app, SendInt, "setActivationPolicy:", ApplicationActivationPolicy.REGULAR.val);  
-    ulong macArgs = WindowStyleMask.CLOSABLE.val | WindowStyleMask.MINIATURIZABLE.val | BackingStore.BUFFERED.val | WindowStyleMask.TITLED.val | WindowStyleMask.RESIZABLE.val;
-    ObjcClass* win = objc::msg_send(objc::alloc(objc::getClass("NSWindow")), SendContentRec, "initWithContentRect:styleMask:backing:defer:", Rect {{200.0, 200.0}, {200.0, 200.0}}, macArgs, macArgs, false);
-    ObjcClass delegate_cls = objc::allocateClassPair(objc::getClass("NSObject"), "WindowDelegate", 0);
-    objc::class_addIvar(delegate_cls, "NSWindow", $sizeof(win), math::log2($sizeof(win)), "L");
-    objc::class_addMethod(delegate_cls, objc::sel_registerName("windowWillResize:toSize:"), &resize_window, "{NSSize=ff}@:{NSSize=ff}");
-    ObjcId delegate = objc::msg_send(objc::alloc(delegate_cls), SendVoid, "init");
-    objc::object_setInstanceVariable(delegate, "NSWindow", win);
-    objc::msg_send(win, SendId, "setDelegate:", delegate);
-    objc::msg_send(app, SendBool, "activateIgnoringOtherApps:", true);
-    objc::msg_send(win, SendSelector, "makeKeyAndOrderFront:", null);
-    objc::msg_send(win, SendBool, "setIsVisible:", true);
-    objc::msg_send(app, SendVoid, "finishLaunching");
+    NSObject object = NSObject{ .cls = objc::getClass("NSObject") }; 
+    object.add_method("windowShouldClose:", &on_close)!!;
+
+    NSApplication app = NSApplication { .cls = objc::getClass("NSApplication") };
+    app.sharedApplication();
+    app.setActivationPolicy(ApplicationActivationPolicy.REGULAR);
+
+    NSWindow win = NSWindow { .cls = objc::getClass("NSWindow") };
+    win = objc::alloc(win);
+    ulong window_style = WindowStyleMask.CLOSABLE.val | WindowStyleMask.MINIATURIZABLE.val | BackingStore.BUFFERED.val | WindowStyleMask.TITLED.val | WindowStyleMask.RESIZABLE.val;
+    win.initWithContentRect(NSRect {{200.0, 200.0}, {200.0, 200.0}}, window_style, window_style, false);
+
+    NSObject delegate = NSObject { .cls = objc::getClass("NSObject") };
+    delegate.alloc_class_pair("WindowDelegate", 0);
+    delegate.add_ivar("NSWindow", $sizeof(win), math::log2($sizeof(win)), "L")!!;
+    delegate.add_method("windowWillResize:toSize:", &resize_window, "{NSSize=ff}@:{NSSize=ff}")!!;
+    delegate = objc::alloc(delegate);
+    delegate.init();
+    delegate.setInstanceVariable("NSWindow", win);
+    win.setDelegate(delegate);
+    win.makeKeyAndOrderFront(null);
+    win.setIsVisible(true);
+    app.activateIgnoringOtherApps(true);
+    app.finishLaunching();
 
     while(running) {
-        ObjcId pool = objc::msg_send(objc::alloc(objc::getClass("NSAutoreleasePool")), SendVoid, "init");
-        ObjcId loop = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", "kCFRunLoopDefaultMode");
-        ObjcClass* e = objc::msg_send(app, SendDequeueEvent, "nextEventMatchingMask:untilDate:inMode:dequeue:", long.max, null, loop, true);
-        int type = objc::msg_send(e, GetInt, "type");
-        Point p = objc::msg_send(e, GetPoint, "locationInWindow");
+        NSAutoreleasePool pool = NSAutoreleasePool { .cls = objc::getClass("NSAutoreleasePool") }; 
+        pool = objc::alloc(pool);
+        pool.init();
+
+        NSString loop = NSString { .cls = objc::getClass("NSString") };
+        loop.stringWithUTF8String("kCFRunLoopDefaultMode");
+
+        NSEvent event = app.nextEventMatchingMask(long.max, null, loop, true);
+        int type = event.get_type();
+        NSPoint pos = event.locationInWindow();
 
         if (type != 0) {
 			io::printfn("Event [type=%s location={%d, %d} modifierFlags={%s}]", 
                 objc::event_type_from(type)!!, 
-                p.x, p.y, 
-                objc::modifier_to_str(objc::msg_send(e, GetInt, "modifierFlags")));
+                pos.x, pos.y, 
+                objc::modifier_to_str(event.get_modifierFlags()));
         }
 
-        objc::msg_send(win, SendId, "sendEvent:", e);
-        objc::msg_send(app, SendVoid, "updateWindows");
-        objc::msg_send(pool, SendVoid, "release"); 
+        win.sendEvent(event);
+        app.updateWindows();
+        objc::release(pool);
     }
 }
 
-fn bool on_close(void* self)
+fn bool on_close(ObjcId self)
 {
     io::printn("closing window..");
-    ObjcClass* win;
-    objc::object_getInstanceVariable(self, "NSWindow", &win);
-    if (win == null) return true;
+    if (catch self.get_ivar("NSWindow")) return true;
     running = false;
     return true;
 }
 
-fn Size resize_window(void* self, Size frame)
+fn NSSize resize_window(ObjcId self, NSSize frame)
 {
-    ObjcClass* win;
-    objc::object_getInstanceVariable(self, "NSWindow", &win);
-    if (win == null) return frame;
+    if (catch self.get_ivar("NSWindow")) return frame;
 	io::printfn("window resized to %f %f", frame.width, frame.height);
     return frame;
 }

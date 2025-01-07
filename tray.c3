@@ -1,130 +1,144 @@
 import std::os::macos::objc, objc;
-import std::io;
+import std::io, std::collections::list;
 
 def Callback = fn void(Menu *item);
-def SendSize = fn void*(void*, ObjcSelector, Size);
-def SendIdId = fn void*(void*, ObjcSelector, ObjcId, ObjcId);
 
 struct Tray {
     ZString icon;
-    Menu[] menu;
+    Menu*[] menu;
 }
 
 struct Menu {
+    Menu*[] sub_menu;
     ZString text;
     bool disabled;
     bool checked;
     bool checkbox;
     Callback cb;
-    Menu[] *sub_menu;
 }
 
-const ZString TRAY_ICON = "icon.png";
-ObjcId app;
-ObjcId status_bar; 
-ObjcId status_item;
+const ZString ICON_GREEN = "circle_green.png";
+const ZString ICON_RED = "circle_red.png";
+Tray tray;
+NSApplication app;
+NSStatusBarItem status_item;
 bool running = true;
 
 fn void menu_callback(ObjcId self, ObjcSelector sel, ObjcId sender)
 {
-    ObjcId representedObject = objc::msg_send(sender, SendVoid, "representedObject");
-    ObjcId pointerValue = objc::msg_send(representedObject, SendVoid, "pointerValue");
-    ZString title = (ZString)(char*) objc::msg_send(objc::msg_send(sender, SendVoid, "title"), SendVoid, "UTF8String");
-
+    ObjcId representedObject = sender.call(SendVoid, "representedObject");
+    ObjcId pointerValue = representedObject.call(SendVoid, "pointerValue");
+    ZString title = (ZString)(char*) sender.call(SendVoid, "title").call(SendVoid, "UTF8String");
     if(pointerValue) {
         Menu* menu = (Menu*) pointerValue;
-        io::printfn("%s [disabled:%d, checked:%d, checkbox:%d, cb:%s, sub_menu:%s]", 
-            title, menu.disabled, menu.checked, menu.checkbox, menu.cb, menu.sub_menu);
-
-        menu.cb(menu);
+        if(menu.cb) {
+            menu.cb(menu);
+        }
     }
 }
 
 fn bool Tray.init(&self)
 {
-    ObjcClass delegate_cls = objc::allocateClassPair(objc::getClass("NSObject"), "AppDelegate", 0);
-    objc::class_addMethod(delegate_cls , objc::sel_registerName("menuCallback:"), &menu_callback, "V@:@");
-    ObjcId delegate = objc::msg_send(objc::alloc(delegate_cls), SendVoid, "init");
-    app = objc::msg_send(objc::getClass("NSApplication"), SendVoid, "sharedApplication");
-    objc::msg_send(app, SendId, "setDelegate:", delegate);
-    status_bar = objc::msg_send(objc::getClass("NSStatusBar"), SendVoid, "systemStatusBar");
-    status_item = objc::msg_send(status_bar, SendDouble, "statusItemWithLength:", StatusItemLength.VARIABLE.val);
+    app = NSApplication{ .cls = objc::getClass("NSApplication") }; // TODO: change to NSApplication.new();
+    app.sharedApplication();
+    app.activateIgnoringOtherApps(true);
+
+    NSObject delegate = NSObject { .cls = objc::getClass("NSObject") };
+    delegate.alloc_class_pair("AppDelegate", 0);
+    delegate.add_method("menuCallback:", &menu_callback, "V@:@")!!;
+    delegate = objc::alloc(delegate);
+    delegate.init();
+    app.setDelegate(delegate);
+
+    NSStatusBar status_bar = NSStatusBar{ .cls = objc::getClass("NSStatusBar") };
+    status_bar.systemStatusBar(); 
+    status_item = status_bar.statusItemWithLength(StatusItemLength.VARIABLE);
     self.update();
-    objc::msg_send(app, SendBool, "activateIgnoringOtherApps:", true);
     return true;
 }
 
 fn void Tray.update(&self)
 {
-    ObjcId ns_str = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", self.icon);
-    ObjcId img = objc::msg_send(objc::alloc(objc::getClass("NSImage")), SendId, "initWithContentsOfFile:", ns_str);
-    objc::msg_send(img, SendSize, "setSize:", Size {16, 16});
-    objc::msg_send(status_item, SendId, "setImage:", img); // deprecated
-    objc::msg_send(status_item, SendId, "setMenu:", ns_menu(self.menu));
+    NSString icon_str = NSString { .cls = objc::getClass("NSString")};
+    icon_str.stringWithUTF8String(self.icon);
+    NSImage img = NSImage { .cls = objc::getClass("NSImage") };
+    img = objc::alloc(img);
+    img.initWithContentsOfFile(icon_str);
+    img.setSize(NSSize {16, 16});
+    status_item.setImage(img); // deprecated
+    status_item.setMenu(ns_menu(self.menu));
 }
 
 fn bool Tray.loop(&self)
 {
-    ObjcId loop = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", "kCFRunLoopDefaultMode");
-    ObjcClass* event = objc::msg_send(app, SendDequeueEvent, "nextEventMatchingMask:untilDate:inMode:dequeue:", long.max, null, loop, true);
+    NSString loop = NSString { .cls = objc::getClass("NSString") };
+    loop.stringWithUTF8String("kCFRunLoopDefaultMode");
+    NSEvent event = app.nextEventMatchingMask(long.max, null, loop, true);
     if (event) {
-        objc::msg_send(app, SendId, "sendEvent:", event);
+        app.sendEvent(event);
     }
-
-    // int type = objc::msg_send(event, GetInt, "type");
-    // if (type != 0) io::printfn("Event [type=%s]", objc::event_type_from(type)!!);
 
     return true;
 }
 
-fn ObjcId ns_menu(Menu[] ms)
+fn NSMenu ns_menu(Menu*[] ms)
 {
     DString indent;
-    ObjcId menu = objc::msg_send(objc::alloc(objc::getClass("NSMenu")), SendVoid, "init");
-    objc::msg_send(menu, SendBool, "setAutoenablesItems:", false);
+    NSMenu menu = NSMenu { .cls = objc::getClass("NSMenu") };
+    menu = objc::alloc(menu);
+    menu.init();
+    menu.setAutoenablesItems(false);
 
     foreach(m: ms) {
         if (m.text.str_view() == "-") {
-            ObjcId separator = objc::msg_send(objc::getClass("NSMenuItem"), SendVoid, "separatorItem");
-            objc::msg_send(menu, SendId, "addItem:", separator);
+            NSMenuItem separator = NSMenuItem { .cls = objc::getClass("NSMenuItem")};
+            separator.separatorItem();
+            menu.addItem(separator);
         } else { 
-            ObjcClass menu_item_cls = objc::getClass("NSMenuItem");
-            ObjcId title = objc::msg_send(objc::getClass("NSString"), SendString, "stringWithUTF8String:", m.text);
-            ObjcId menu_item = objc::msg_send(objc::alloc(menu_item_cls), SendVoid, "init");
-            objc::msg_send(menu_item, SendId, "setTitle:", title);
-            objc::msg_send(menu_item, SendSelector, "setAction:", objc::sel_registerName("menuCallback:"));
-            objc::msg_send(menu_item, SendBool, "setEnabled:", !m.disabled);
-            objc::msg_send(menu_item, SendInt, "setState:", m.checked ? 1 : 0);
-            ObjcId value = objc::msg_send(objc::getClass("NSValue"), SendPtr, "valueWithPointer:", @tclone(m));
-            objc::msg_send(menu_item, SendId, "setRepresentedObject:", value);
-            objc::msg_send(menu, SendId, "addItem:", menu_item);
+            NSString title = NSString { .cls = objc::getClass("NSString")};
+            title.stringWithUTF8String(m.text);
+            NSMenuItem menu_item = NSMenuItem { .cls = objc::getClass("NSMenuItem")};
+            menu_item = objc::alloc(menu_item);
+            menu_item.init();
+            menu_item.setTitle(title);
+            menu_item.setAction(objc::sel_registerName("menuCallback:"));
+            menu_item.setEnabled(!m.disabled);
+            menu_item.setState(m.checked);
+            NSValue value = NSValue { .cls = objc::getClass("NSValue")};
+            value.valueWithPointer(m);
+            menu_item.setRepresentedObject(value);
+            menu.addItem(menu_item);
             if (m.sub_menu) {
-                objc::msg_send(menu, SendIdId, "setSubmenu:forItem:", ns_menu(*m.sub_menu), menu_item);
+                menu.setSubmenu(ns_menu(m.sub_menu), menu_item);
             }
         }
     }
     return menu;
 }
 
-fn void cb_hello(Menu *item)
+fn void cb_icon(Menu *item)
 {
-    io::printfn("hello");
-    tray.icon = TRAY_ICON;
+    if (tray.icon == ICON_RED) {
+        tray.icon = ICON_GREEN;
+    } else {
+        tray.icon = ICON_RED;
+    }
     tray.update();
 }
 
 fn void cb_toggle(Menu *item)
 {
-    io::printfn("toggle checked");
     item.checked = !item.checked;
     tray.update();
 }
 
 fn void cb_quit(Menu *item)
 {
-    io::printfn("quit");
     running = false;
-    objc::msg_send(app, SendId, "terminate", app);
+    app.terminate();
+    foreach(ptr: ptrs) {
+        (void)free(ptr);
+    }
 }
 
 fn void cb_sub_menu(Menu *item)
@@ -133,38 +147,42 @@ fn void cb_sub_menu(Menu *item)
     tray.update();
 }
 
-Tray tray = {
-    .icon = TRAY_ICON,
-    .menu = Menu[] {
-        { .text = "Status", .cb = &cb_hello },
-        { .text = "Checked", .checked = true, .cb = &cb_toggle },
-        { .text = "Disabled", .disabled = true },
-        { .text = "-" },
-        { .text = "SubMenu", .sub_menu = &&Menu[] {
-            { .text = "First", .checked = true, .cb = &cb_sub_menu },
-            { .text = "Second", .sub_menu = &&Menu[] {
-                { .text = "Third", .sub_menu = &&Menu[] {
-                    { .text = "7", .cb = &cb_sub_menu },
-                    { .text = "-" },
-                    { .text = "8", .cb = &cb_sub_menu },
-                }},
-                { .text = "Fourth", .sub_menu = &&Menu[] {
-                    { .text = "5", .cb = &cb_sub_menu },
-                    { .text = "6", .cb = &cb_sub_menu },
-                }},
-            }}
-        }},
-        { .text = "-" },
-        { .text = "Quit", .cb = &cb_quit },
-    }
-};
+List(<void*>) ptrs;
+fn Menu* save(Menu* ptr) {
+    ptrs.push(ptr);
+    return ptr;
+}
 
 fn void main()
 {
     @pool() {
+        Menu* separator = save(mem::new(Menu, { .text = "-" }));
+        tray = Tray {
+            .icon = ICON_GREEN,
+            .menu = Menu*[] { 
+                save(mem::new(Menu, { .text = "Change icon", .cb = &cb_icon })),
+                save(mem::new(Menu, { .text = "Checked", .checked = true, .cb = &cb_toggle })),
+                save(mem::new(Menu, { .text = "Disabled", .disabled = true })),
+                separator,
+                save(mem::new(Menu, { .text = "SubMenu", .sub_menu = Menu*[]{ 
+                    save(mem::new(Menu, { .text = "First", .checked = true, .cb = &cb_toggle })),
+                    save(mem::new(Menu, { .text = "Second", .sub_menu = Menu*[]{ 
+                        save(mem::new(Menu, { .text = "7", .cb = &cb_sub_menu })),
+                        save(mem::new(Menu, { .text = "8", .cb = &cb_sub_menu })),
+                    }})),
+                    save(mem::new(Menu, { .text = "Fourth", .sub_menu = Menu*[]{ 
+                        save(mem::new(Menu, { .text = "5", .cb = &cb_sub_menu })),
+                        save(mem::new(Menu, { .text = "6", .cb = &cb_sub_menu })),
+                    }})),
+                }})),
+                separator,
+                save(mem::new(Menu, { .text = "Quit", .cb = &cb_quit })),
+            }
+        };
+
         tray.init();
         while (tray.loop() && running) {
-            
+            // do stuff
         };
     };
 }
