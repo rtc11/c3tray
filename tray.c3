@@ -37,7 +37,7 @@ fn void menu_callback(ObjcId self, ObjcSelector sel, ObjcId sender)
     }
 }
 
-fn bool Tray.init(&self)
+fn bool Tray.setup(&self)
 {
     app = NSApplication{ .cls = objc::getClass("NSApplication") }; // TODO: change to NSApplication.new();
     app.sharedApplication();
@@ -182,7 +182,7 @@ fn void main()
             }
         };
 
-        tray.init();
+        tray.setup();
         while (tray.loop() && running) {
             // do stuff
         };
