@@ -6,23 +6,23 @@ bool running = true;
 
 fn void main()
 {
-    NSObject object = NSObject{ .cls = objc::getClass("NSObject") }; 
+    NSObject object = objc::new("NSObject"); 
     object.add_method("windowShouldClose:", &on_close)!!;
 
     NSApplication app = NSApplication { .cls = objc::getClass("NSApplication") };
     app.sharedApplication();
     app.setActivationPolicy(ApplicationActivationPolicy.REGULAR);
 
-    NSWindow win = NSWindow { .cls = objc::getClass("NSWindow") };
-    win = objc::alloc(win);
+    NSWindow win = objc::new("NSWindow");
+    win.alloc();
     ulong window_style = WindowStyleMask.CLOSABLE.val | WindowStyleMask.MINIATURIZABLE.val | BackingStore.BUFFERED.val | WindowStyleMask.TITLED.val | WindowStyleMask.RESIZABLE.val;
     win.initWithContentRect(NSRect {{200.0, 200.0}, {200.0, 200.0}}, window_style, window_style, false);
 
-    NSObject delegate = NSObject { .cls = objc::getClass("NSObject") };
+    NSObject delegate = objc::new("NSObject");
     delegate.alloc_class_pair("WindowDelegate", 0);
     delegate.add_ivar("NSWindow", $sizeof(win), math::log2($sizeof(win)), "L")!!;
     delegate.add_method("windowWillResize:toSize:", &resize_window, "{NSSize=ff}@:{NSSize=ff}")!!;
-    delegate = objc::alloc(delegate);
+    delegate.alloc();
     delegate.init();
     delegate.setInstanceVariable("NSWindow", win);
     win.setDelegate(delegate);
@@ -32,14 +32,17 @@ fn void main()
     app.finishLaunching();
 
     while(running) {
-        NSAutoreleasePool pool = NSAutoreleasePool { .cls = objc::getClass("NSAutoreleasePool") }; 
-        pool = objc::alloc(pool);
+        NSAutoreleasePool pool = objc::new("NSAutoreleasePool"); 
+        pool.alloc();
         pool.init();
 
-        NSString loop = NSString { .cls = objc::getClass("NSString") };
+        NSString loop = objc::new("NSString");
         loop.stringWithUTF8String("kCFRunLoopDefaultMode");
 
-        NSEvent event = app.nextEventMatchingMask(long.max, null, loop, true);
+        NSDate until; 
+        // NSDate until = objc::new("NSDate"); 
+        // until.distantFuture();
+        NSEvent event = app.nextEventMatchingMask(long.max, until, loop, true);
         int type = event.get_type();
         NSPoint pos = event.locationInWindow();
 
@@ -52,7 +55,7 @@ fn void main()
 
         win.sendEvent(event);
         app.updateWindows();
-        objc::release(pool);
+        pool.release();
     }
 }
 

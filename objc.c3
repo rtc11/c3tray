@@ -19,12 +19,9 @@ def GetInt = fn int(void*, ObjcSelector);
 def GetPoint = fn NSPoint(void*, ObjcSelector);
 
 fault ObjcFault {
-    UNKNOWN_EVENT,
-    CLASS_NOT_FOUND,
     IVAR_NOT_SET,
     IVAR_NOT_FOUND,
     METHOD_NOT_SET,
-    CLASS_INSTANTIATED,
 }
 
 struct NSObject {
@@ -45,25 +42,18 @@ def NSDate = NSObject;
 distinct NSEvent = void*;
 distinct NSStatusBarItem = void*;
 
-// TODO: @operator(construct) is comming in 0.6.6
-// fn NSApplication NSApplication.new() @operator(construct)
+macro NSObject new(ZString cls_name = "NSObject")
+{
+    NSObject self;
+    self.cls = objc::getClass(cls_name);
+    return self;
+}
+// macro NSObject NSObject.new() @operator(construct)
 // {
-//     self.cls = get_class("NSApplication");
+//     NSObject self;
+//     self.cls = objc::getClass("NSApplication");
 //     return self;
 // }
-
-// DEPRECATED: in c3c v0.6.6 
-def SendVoid = fn void*(void*, ObjcSelector);
-// DEPRECATED: in c3c v0.6.6 
-extern fn ObjcClass allocateClassPair(ObjcClass cls, ZString name, uint extraBytes) @extern("objc_allocateClassPair");
-// DEPRECATED: in c3c v0.6.6 
-extern fn bool class_addMethod(ObjcClass cls, ObjcSelector name, void* imp, ZString types);
-// DEPRECATED: in c3c v0.6.6 
-extern fn ObjcIvar getInstanceVariable(ObjcId id, ZString name, void* outValue) @extern("object_getInstanceVariable");
-// DEPRECATED: in c3c v0.6.6 
-extern fn ObjcIvar setInstanceVariable(ObjcId id, ZString name, void* value) @extern("object_setInstanceVariable");
-// DEPRECATED: in c3c v0.6.6 
-extern fn bool class_addIvar(ObjcClass cls, ZString name, int size, double alignment, ZString types);
 
 <* @require self.id `self is not initialized` *>
 macro NSObject.call(&self, $FunctionType, ZString $selector, ...)
@@ -78,7 +68,7 @@ macro ObjcId.call(ObjcId self, $FunctionType, ZString $selector, ...)
 
 fn void NSObject.alloc_class_pair(&self, ZString name, uint extra_bytes)
 {
-    self.cls = allocateClassPair(self.cls, name, extra_bytes);
+    self.cls = objc::allocateClassPair(self.cls, name, extra_bytes);
 }
 
 fn void NSApplication.sharedApplication(&self)
@@ -278,47 +268,47 @@ fn void NSWindow.setIsVisible(&self, bool flag)
     objc::msg_send(self.id, SendBool, "setIsVisible:", flag);
 }
 
-fn NSObject alloc(NSObject object) {
-    object.id = objc::msg_send(object.cls, SendVoid, "alloc");
-    return object;
+fn void NSObject.alloc(&self)
+{
+    self.id = objc::msg_send(self.cls, SendVoid, "alloc");
 }
 
-<* @require object.id `NSObject is not allocated` *>
-fn void release(NSObject object)
+<* @require self.id `NSObject is not allocated` *>
+fn void NSObject.release(&self)
 {
-    objc::msg_send(object.id, SendVoid, "release");
+    objc::msg_send(self.id, SendVoid, "release");
 }
 
 <* @require self.id == null `NSObject is already initialized` *>
 macro NSObject! NSObject.add_method(NSObject self, ZString name, void* imp, ZString types = "")
 {
-    if(!class_addMethod(self.cls, objc::sel_registerName(name), imp, types)) return ObjcFault.METHOD_NOT_SET?;
+    if(!objc::class_addMethod(self.cls, objc::sel_registerName(name), imp, types)) return ObjcFault.METHOD_NOT_SET?;
     return self;
 }
 
 macro ObjcClass! ObjcClass.add_method(ObjcClass self, ZString name, void* imp, ZString types = "") 
 {
-    if(!class_addMethod(self, register_name(name), imp, types)) return ObjcFault.METHOD_NOT_SET?;
+    if(!objc::class_addMethod(self, register_name(name), imp, types)) return ObjcFault.METHOD_NOT_SET?;
     return self;
 }
 
 macro NSObject! NSObject.add_ivar(NSObject self, ZString name, int size, double alignment, ZString types) 
 {
-    if(!class_addIvar(self.cls, name, size, alignment, types)) return ObjcFault.IVAR_NOT_SET?;
+    if(!objc::class_addIvar(self.cls, name, size, alignment, types)) return ObjcFault.IVAR_NOT_SET?;
     return self;
 }
 
 macro ObjcIvar! ObjcId.get_ivar(ObjcId self, ZString name)
 {
     ObjcIvar out;
-    if(!getInstanceVariable(self, name, &out)) return ObjcFault.IVAR_NOT_FOUND?; 
+    if(!objc::getInstanceVariable(self, name, &out)) return ObjcFault.IVAR_NOT_FOUND?; 
     return out;
 }
 
 <* @require self.id `NSObject is not initialized` *>
 macro void NSObject.setInstanceVariable(NSObject self, ZString name, NSObject out)
 {
-    setInstanceVariable(self.id, name, out.id);
+    objc::setInstanceVariable(self.id, name, out.id);
 }
 
 struct NSPoint {
@@ -336,143 +326,6 @@ struct NSRect {
     NSSize size;
 }
 
-
-// DEPRECATED: in c3c v0.6.6 
-enum StatusItemLength : (double val)
-{
-    VARIABLE = -1.0,
-    SQUARE   = -2.0,
-}
-
-// DEPRECATED: in c3c v0.6.6 
-enum ApplicationActivationPolicy : (int val)
-{
-	REGULAR    = 0,
-	ACCESSORY  = 1,
-	PROHIBITED = 2,
-}
-
-// DEPRECATED: in c3c v0.6.6 
-enum WindowStyleMask : (int val)
-{
-    BORDERLESS                = 0,
-    TITLED                    = 1 << 0,
-    CLOSABLE                  = 1 << 1,
-	MINIATURIZABLE            = 1 << 2,
-	RESIZABLE                 = 1 << 3,
-	TEXTURED_BACKGROUND       = 1 << 8,
-	UNIFIED_TITLE_AND_TOOLBAR = 1 << 12,
-	FULL_SCREEN               = 1 << 14,
-	FULL_SIZE_CONTENT_VIEW    = 1 << 15,
-	UTILITY_WINDOW            = 1 << 4,
-	DOC_MODAL_WINDOW          = 1 << 6,
-	NONACTIVATING_PANEL       = 1 << 7,
-	HUD_WINDOW                = 1 << 13
-}
-
-// DEPRECATED: in c3c v0.6.6 
-enum BackingStore : (int val)
-{
-	RETAINED    = 0,
-	NONRETAINED = 1,
-	BUFFERED    = 2
-}
-
-// DEPRECATED: in c3c v0.6.6 
-enum EventType : (long val)
-{
-	LEFT_MOUSE_DOWN     = 1,
-	LEFT_MOUSE_UP       = 2,
-	RIGHT_MOUSE_DOWN    = 3,
-	RIGHT_MOUSE_UP      = 4,
-	MOUSE_MOVED         = 5,
-	LEFT_MOUSE_DRAGGED  = 6,
-	RIGHT_MOUSE_DRAGGED = 7,
-	MOUSE_ENTERED       = 8,
-	MOUSE_EXITED        = 9,
-	KEY_DOWN            = 10,
-	KEY_UP              = 11,
-	FLAGS_CHANGED       = 12,
-	APPKIT_DEFINED      = 13,
-	SYSTEM_DEFINED      = 14,
-	APPLICATION_DEFINED = 15,
-	PERIODIC            = 16,
-	CURSOR_UPDATE       = 17,
-	SCROLL_WHEEL        = 22,
-	TABLET_POINT        = 23,
-	TABLET_PROXIMITY    = 24,
-	OTHER_MOUSE_DOWN    = 25,
-	OTHER_MOUSE_UP      = 26,
-	OTHER_MOUSE_DRAGGED = 27,
-	GESTURE             = 29,
-	MAGNIFY             = 30,
-	SWIPE               = 31,
-	ROTATE              = 18,
-	BEGIN_GESTURE       = 19,
-	END_GESTURE         = 20,
-	SMART_MAGNIFY       = 32,
-	QUICK_LOOK          = 33,
-	PRESSURE            = 34,
-	DIRECT_TOUCH        = 37,
-	CHANGE_MODE         = 38,
-}
-
-// DEPRECATED: in c3c v0.6.6 
-fn EventType! event_type_from(int val)
-{
-    switch(val) {
-        case EventType.LEFT_MOUSE_DOWN.val:     return LEFT_MOUSE_DOWN;
-        case EventType.LEFT_MOUSE_UP.val:       return LEFT_MOUSE_UP;
-        case EventType.RIGHT_MOUSE_DOWN.val:    return RIGHT_MOUSE_DOWN;
-        case EventType.RIGHT_MOUSE_UP.val:      return RIGHT_MOUSE_UP;
-        case EventType.MOUSE_MOVED.val:         return MOUSE_MOVED;
-        case EventType.LEFT_MOUSE_DRAGGED.val:  return LEFT_MOUSE_DRAGGED;
-        case EventType.RIGHT_MOUSE_DRAGGED.val: return RIGHT_MOUSE_DRAGGED;
-        case EventType.MOUSE_ENTERED.val:       return MOUSE_ENTERED;
-        case EventType.MOUSE_EXITED.val:        return MOUSE_EXITED;
-        case EventType.KEY_DOWN.val:            return KEY_DOWN;
-        case EventType.KEY_UP.val:              return KEY_UP;
-        case EventType.FLAGS_CHANGED.val:       return FLAGS_CHANGED;
-        case EventType.APPKIT_DEFINED.val:      return APPKIT_DEFINED;
-        case EventType.SYSTEM_DEFINED.val:      return SYSTEM_DEFINED;
-        case EventType.APPLICATION_DEFINED.val: return APPLICATION_DEFINED;
-        case EventType.PERIODIC.val:            return PERIODIC;
-        case EventType.CURSOR_UPDATE.val:       return CURSOR_UPDATE;
-        case EventType.SCROLL_WHEEL.val:        return SCROLL_WHEEL;
-        case EventType.TABLET_POINT.val:        return TABLET_POINT;
-        case EventType.TABLET_PROXIMITY.val:    return TABLET_PROXIMITY;
-        case EventType.OTHER_MOUSE_DOWN.val:    return OTHER_MOUSE_DOWN;
-        case EventType.OTHER_MOUSE_UP.val:      return OTHER_MOUSE_UP;
-        case EventType.OTHER_MOUSE_DRAGGED.val: return OTHER_MOUSE_DRAGGED;
-        case EventType.GESTURE.val:             return GESTURE;
-        case EventType.MAGNIFY.val:             return MAGNIFY;
-        case EventType.SWIPE.val:               return SWIPE;
-        case EventType.ROTATE.val:              return ROTATE;
-        case EventType.BEGIN_GESTURE.val:       return BEGIN_GESTURE;
-        case EventType.END_GESTURE.val:         return END_GESTURE;
-        case EventType.SMART_MAGNIFY.val:       return SMART_MAGNIFY;
-        case EventType.QUICK_LOOK.val:          return QUICK_LOOK;
-        case EventType.PRESSURE.val:            return PRESSURE;
-        case EventType.DIRECT_TOUCH.val:        return DIRECT_TOUCH;
-        case EventType.CHANGE_MODE.val:         return CHANGE_MODE;
-        default: return ObjcFault.UNKNOWN_EVENT?;
-    }
-}
-
-// DEPRECATED: in c3c v0.6.6 
-enum EventModifierFlag : (int val)
-{
-	CAPS_LOCK   = 1 << 16,
-	SHIFT       = 1 << 17,
-	CONTROL     = 1 << 18,
-	OPTION      = 1 << 19,
-	COMMAND     = 1 << 20,
-	NUMERIC_PAD = 1 << 21,
-    FUNCTION    = 1 << 23,
-	HELP        = 1 << 22,
-}
-
-// DEPRECATED: in c3c v0.6.6 
 fn String modifier_to_str(int modifier) 
 {
     DString result;

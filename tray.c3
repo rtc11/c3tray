@@ -39,18 +39,18 @@ fn void menu_callback(ObjcId self, ObjcSelector sel, ObjcId sender)
 
 fn bool Tray.setup(&self)
 {
-    app = NSApplication{ .cls = objc::getClass("NSApplication") }; // TODO: change to NSApplication.new();
+    app = objc::new("NSApplication");
     app.sharedApplication();
     app.activateIgnoringOtherApps(true);
 
-    NSObject delegate = NSObject { .cls = objc::getClass("NSObject") };
+    NSObject delegate = objc::new("NSObject");
     delegate.alloc_class_pair("AppDelegate", 0);
     delegate.add_method("menuCallback:", &menu_callback, "V@:@")!!;
-    delegate = objc::alloc(delegate);
+    delegate.alloc();
     delegate.init();
     app.setDelegate(delegate);
 
-    NSStatusBar status_bar = NSStatusBar{ .cls = objc::getClass("NSStatusBar") };
+    NSStatusBar status_bar = objc::new("NSStatusBar");
     status_bar.systemStatusBar(); 
     status_item = status_bar.statusItemWithLength(StatusItemLength.VARIABLE);
     self.update();
@@ -59,10 +59,10 @@ fn bool Tray.setup(&self)
 
 fn void Tray.update(&self)
 {
-    NSString icon_str = NSString { .cls = objc::getClass("NSString")};
+    NSString icon_str = objc::new("NSString");
     icon_str.stringWithUTF8String(self.icon);
-    NSImage img = NSImage { .cls = objc::getClass("NSImage") };
-    img = objc::alloc(img);
+    NSImage img = objc::new("NSImage");
+    img.alloc();
     img.initWithContentsOfFile(icon_str);
     img.setSize(NSSize {16, 16});
     status_item.setImage(img); // deprecated
@@ -71,9 +71,9 @@ fn void Tray.update(&self)
 
 fn bool Tray.loop(&self, bool blocking = true)
 {
-    NSDate date = NSDate { .cls = objc::getClass("NSDate")}; 
+    NSDate date = objc::new("NSDate"); 
     blocking ? date.distantFuture() : date.distantPast();
-    NSString loop = NSString { .cls = objc::getClass("NSString") };
+    NSString loop = objc::new("NSString");
     loop.stringWithUTF8String("kCFRunLoopDefaultMode");
     NSEvent event = app.nextEventMatchingMask(long.max, date, loop, true);
     if (event) {
@@ -86,27 +86,27 @@ fn bool Tray.loop(&self, bool blocking = true)
 fn NSMenu ns_menu(Menu*[] ms)
 {
     DString indent;
-    NSMenu menu = NSMenu { .cls = objc::getClass("NSMenu") };
-    menu = objc::alloc(menu);
+    NSMenu menu = objc::new("NSMenu");
+    menu.alloc();
     menu.init();
     menu.setAutoenablesItems(false);
 
     foreach(m: ms) {
         if (m.text.str_view() == "-") {
-            NSMenuItem separator = NSMenuItem { .cls = objc::getClass("NSMenuItem")};
+            NSMenuItem separator = objc::new("NSMenuItem");
             separator.separatorItem();
             menu.addItem(separator);
         } else { 
-            NSString title = NSString { .cls = objc::getClass("NSString")};
+            NSString title = objc::new("NSString");
             title.stringWithUTF8String(m.text);
-            NSMenuItem menu_item = NSMenuItem { .cls = objc::getClass("NSMenuItem")};
-            menu_item = objc::alloc(menu_item);
+            NSMenuItem menu_item = objc::new("NSMenuItem");
+            menu_item.alloc();
             menu_item.init();
             menu_item.setTitle(title);
             menu_item.setAction(objc::sel_registerName("menuCallback:"));
             menu_item.setEnabled(!m.disabled);
             menu_item.setState(m.checked);
-            NSValue value = NSValue { .cls = objc::getClass("NSValue")};
+            NSValue value = objc::new("NSValue");
             value.valueWithPointer(m);
             menu_item.setRepresentedObject(value);
             menu.addItem(menu_item);
