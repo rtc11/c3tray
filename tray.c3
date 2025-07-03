@@ -1,7 +1,7 @@
 import std::os::macos::objc, objc;
 import std::io, std::collections::list;
 
-def Callback = fn void(Menu *item);
+alias Callback = fn void(Menu *item);
 
 struct Tray {
     ZString icon;
@@ -64,7 +64,7 @@ fn void Tray.update(&self)
     NSImage img = objc::new("NSImage");
     img.alloc();
     img.initWithContentsOfFile(icon_str);
-    img.setSize(NSSize {16, 16});
+    img.setSize((NSSize) {16, 16});
     status_item.setImage(img); // deprecated
     status_item.setMenu(ns_menu(self.menu));
 }
@@ -149,7 +149,7 @@ fn void cb_sub_menu(Menu *item)
     tray.update();
 }
 
-List(<void*>) ptrs;
+List{void*} ptrs;
 fn Menu* save(Menu* ptr) {
     ptrs.push(ptr);
     return ptr;
@@ -159,20 +159,20 @@ fn void main()
 {
     @pool() {
         Menu* separator = save(mem::new(Menu, { .text = "-" }));
-        tray = Tray {
+        tray = {
             .icon = ICON_GREEN,
-            .menu = Menu*[] { 
+            .menu = (Menu*[]) { 
                 save(mem::new(Menu, { .text = "Change icon", .cb = &cb_icon })),
                 save(mem::new(Menu, { .text = "Checked", .checked = true, .cb = &cb_toggle })),
                 save(mem::new(Menu, { .text = "Disabled", .disabled = true })),
                 separator,
-                save(mem::new(Menu, { .text = "SubMenu", .sub_menu = Menu*[]{ 
+                save(mem::new(Menu, { .text = "SubMenu", .sub_menu = (Menu*[]){ 
                     save(mem::new(Menu, { .text = "First", .checked = true, .cb = &cb_toggle })),
-                    save(mem::new(Menu, { .text = "Second", .sub_menu = Menu*[]{ 
+                    save(mem::new(Menu, { .text = "Second", .sub_menu = (Menu*[]){ 
                         save(mem::new(Menu, { .text = "7", .cb = &cb_sub_menu })),
                         save(mem::new(Menu, { .text = "8", .cb = &cb_sub_menu })),
                     }})),
-                    save(mem::new(Menu, { .text = "Fourth", .sub_menu = Menu*[]{ 
+                    save(mem::new(Menu, { .text = "Fourth", .sub_menu = (Menu*[]){ 
                         save(mem::new(Menu, { .text = "5", .cb = &cb_sub_menu })),
                         save(mem::new(Menu, { .text = "6", .cb = &cb_sub_menu })),
                     }})),
