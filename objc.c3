@@ -301,7 +301,7 @@ macro ObjcIvar? ObjcId.get_ivar(ObjcId self, ZString name)
     return out;
 }
 
-<* @require self.id `NSObject is not initialized` *>
+<* @require self.id != null `NSObject is not initialized` *>
 macro void NSObject.setInstanceVariable(NSObject self, ZString name, NSObject out)
 {
     objc::setInstanceVariable(self.id, name, out.id);

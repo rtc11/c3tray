@@ -9,14 +9,14 @@ fn void main()
     NSObject object = objc::new("NSObject"); 
     object.add_method("windowShouldClose:", &on_close)!!;
 
-    NSApplication app = NSApplication { .cls = objc::getClass("NSApplication") };
+    NSApplication app = { .cls = objc::getClass("NSApplication") };
     app.sharedApplication();
     app.setActivationPolicy(ApplicationActivationPolicy.REGULAR);
 
     NSWindow win = objc::new("NSWindow");
     win.alloc();
     ulong window_style = WindowStyleMask.CLOSABLE.val | WindowStyleMask.MINIATURIZABLE.val | BackingStore.BUFFERED.val | WindowStyleMask.TITLED.val | WindowStyleMask.RESIZABLE.val;
-    win.initWithContentRect(NSRect {{200.0, 200.0}, {200.0, 200.0}}, window_style, window_style, false);
+    win.initWithContentRect({{200.0, 200.0}, {200.0, 200.0}}, window_style, window_style, false);
 
     NSObject delegate = objc::new("NSObject");
     delegate.alloc_class_pair("WindowDelegate", 0);
